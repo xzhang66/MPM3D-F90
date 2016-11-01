@@ -1,0 +1,29 @@
+2014.11.13
+   1. 修正eos2中拉伸失效对压力的处理方法（将压力置零，与MPM3D一致）。原来的处理方式会导致在计算超高速碰撞算例时，
+      在计算后期边界附近的粒子速度突然会变得很大。
+   2. 增加超高速碰撞算例文件及说明文件：LeadHypervelocityImpact.mpm & 铅球超高速撞击铅靶.pdf
+
+2014.9.9
+   1. Bug fix. Line 407 in Constitution.f90:  dinc(2)*(sold(2)+sd(1)) ===> dinc(2)*(sold(2)+sd(2))
+   2. Use half step size when updating the velocity at the first time step:  Line 312 in update_step.f90
+   3. Line 15 in Taylor.mpm: spz  0.0 26.28 ===> spz  0.0 26.6
+
+2014.6.12
+   1. Bug fix. Line 404 in DataIn.f90: mat_list(i)%MatType = 10  ===> mat_list(i)%MatType = 7
+2014.4.2
+   1. Fix the bug of the frictional force calculation in subroutine Lagr_NodContact()
+   2. Adjust the calculation steps: the step 2 is only for USF in program MPM3D
+   3. Fix the bug for Cutoff calculation in DataIn module.
+   4. Fix the bug for the kinetic energy calculation in  DataIn module
+   5. Modify some comments
+   
+2014.1.24
+   1. 增加第251~252页A.2.3节算例的输入文件TNT3D.mpm
+
+2013.12.9
+   1. Change the format of POINT keyword to: part point comID num(i);
+   2. Change "pmass(r)" in BLOCK and SPHE to "density(r)";
+
+2013.10.9
+   Fix bugs caused by uninitialized variables in Class Particle.
+

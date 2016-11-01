@@ -1,0 +1,47 @@
+mpm3d *** 1D TNT
+! Unit: mm  g  N  ms  MPa
+nbco 1
+nbbo 1
+nbmp 4000 ! 
+nmat 1
+
+spx   0.00   101.0
+spy   0.00   0.05
+spz   0.0    0.05
+dcell  0.05
+
+dtscale 0.1
+endtime 0.015
+
+outtime 1.0d-3
+rpttime 1.0d-4
+
+musl on
+jaum on
+bulk 1.5 0.06
+
+tecp
+para
+outr pres
+outr velx
+curv pres 500
+curv pres 1600
+curv pres 2800
+curv pres 3900
+!      x0  xn  y0  yn  z0  zn
+fixed  2   0   2   2   2   2
+
+material
+!  num     mtype  density   detonation D
+    1      hiex    1.63d-3   6930
+! set EOS parameter
+!    mid etype     A      B      R1    R2  omega  E0
+seos  1    3   3.712d5 3.21d3  4.15  0.95  0.3  6993
+! set detonation point
+deto 0 0 0
+
+ Particle block 1 
+! matid density dp 0x 0y 0z nx ny nz
+    1     1.63d-3 0.025 0 0 0 4000 1 1
+ 
+endi

@@ -1,0 +1,53 @@
+mpm3d *** test hypervelocity impact of lead sphere on lead plate
+! 铅球高速撞击铅靶
+! ref: Anderson 1990，IJIE
+! Unit: mm g N ms MPa
+nbco 2
+nbbo 2
+nbmp 138278 !
+nmat 1
+spx   -50   250.0
+spy  -80   80
+spz  -80   80
+dcell  2.12
+!      x0  xn  y0  yn  z0  zn
+fixed  0   0   0   0   0   0
+
+dtscale 0.001
+endtime 0.030  ! test
+outtime 0.002
+rpttime 0.001
+
+musl on
+jaum on
+
+tecp
+pt2d -50 250.0 0 80 -80  80
+outr epef
+outr seqv
+outr fail
+outr velx
+outr cels
+
+material
+
+!  num   mtype       density     young's   Poission      A       B      n   C    epso   epf 
+      1   sjcf   11.350d-3      22.4d3     0.42d0   12.0   125.0  1.0   0.0    1e-3 3.0 !  (lead)
+
+! set EOS parameter
+! type num  wave  s    r
+ seos    1     2     2.092d3  1.45  2.0  0    !(lead)
+
+Particle sphere 1
+!matid  pmass dp 0x 0y 0z nx
+   1     13.5180d-3 1.06 -7.50 0 0 7 
+Particle block 2 
+! matid pmass dp 0x 0y 0z nx ny nz
+    1     13.5180d-3 1.06 0 -80 -80 6 151 151
+ 
+ 
+velo
+body 1 6580.0 0.0 0.0
+endv
+
+endi

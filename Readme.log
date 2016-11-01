@@ -1,0 +1,10 @@
+src:  Souce codes
+make
+    gnu:  make file for GNU Fortran compiler
+    ivf:  solution file for Intel Visual Fortran compiler
+
+Data:  Example input data
+    Deto1k.mpm:  1D slab TNT detonation
+    Taylor.mpm:  Taylor bar impact
+    PeneOgive.mpm:  Penetration of a ogive projectile
+    Slopefail.mpm:  Failure of slope

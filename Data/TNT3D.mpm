@@ -1,0 +1,48 @@
+mpm3d *** test detonation simulation
+! Unit: mm g N ms MPa
+nbco 1   
+nbbo 4   
+nbmp 27000
+nmat 2    
+
+deto 0.0 0.0 0.0 
+
+material       
+! num Mp mtype density D 
+1 hiex 1.63d-3 6930
+!Johnson-Cook
+! num Mp mtype density young's Poission Yield0 B n C
+2 sjc 8.9d-3 117.0d3 0.31d0 90 392 0.5 0.0 1d-3
+
+!
+seos 1 3 3.712d5 3.21d3 4.15 0.95 0.35 6000
+
+seos 2 2 3.3d3 1.49 1.96 0
+
+tecp
+spx 0.0 25.0  
+spy 0.0 25.0
+spz 0.0 25.0
+dcell 1.0     
+fixed 2 0 2 0 2 0 
+
+dtscale 0.2    
+endt 0.006     
+musl on        
+jaum on        
+
+outtime 3.0d-4 
+rpttime 5.0d-5 
+pt2d 0 5 0 10 0 10  
+outr pres           
+
+Particle block 1  
+!matID, density, dp, ox, oy, oz, nx, ny, nz
+1 1.63d-3 0.5 0.0,0.0, 0.0, 20 20 20
+Particle block 1
+2 8.9d-3 0.5 10.0 0.0 0.0 10 30 20
+Particle block 1
+2 8.9d-3 0.5 0.0 10.0 0.0 20 10 20
+Particle block 1
+2 8.9d-3 0.5 0.0 0.0 10.0 30 30 10
+endi  
