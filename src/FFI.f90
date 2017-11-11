@@ -99,7 +99,7 @@ contains
     else
        print *, '*** Warning *** Non Numeric Field ', &
             cmd_line(nb_read+1),'on line ',line_nb
-       write(iomsg,*), '*** Warning *** Non Numeric Field ', &
+       write(iomsg,*) '*** Warning *** Non Numeric Field ', &
             cmd_line(nb_read+1),'on line ',line_nb
        nb_word = nb_word - 1
        nb_read = nb_read + 1

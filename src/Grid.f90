@@ -171,8 +171,8 @@ contains
 
     print *, 'Number of grid nodes = ', nb_gridnode
     write(iomsg,*)
-    write(iomsg,"(a14,i10)"),'Number of grid nodes = ', nb_gridnode
-    write(iomsg,"(a14,3i4)"),'cells (x,y,z) ', &
+    write(iomsg,"(a14,i10)") 'Number of grid nodes = ', nb_gridnode
+    write(iomsg,"(a14,3i4)") 'cells (x,y,z) ', &
                               numcellx,numcelly,numcellz
 
     allocate(grid_list(nb_component, nb_gridnode))

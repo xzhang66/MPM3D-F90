@@ -1082,7 +1082,7 @@ contains
        tmass = tmass + cmass
        tke = tke + cke
        tie = tie + cie
-       write(iomsg,"(a25,e12.4)"), ' mass:', cmass
+       write(iomsg,"(a25,e12.4)") ' mass:', cmass
        write(iomsg,"(a25,e12.4)") '  kinetic energy:', cke
        write(iomsg,"(a25,e12.4)") ' internal energy:', cie
     end do
