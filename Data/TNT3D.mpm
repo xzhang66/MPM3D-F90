@@ -8,10 +8,10 @@ nmat 2
 deto 0.0 0.0 0.0 
 
 material       
-! num Mp mtype density D 
+! num mtype density D 
 1 hiex 1.63d-3 6930
 !Johnson-Cook
-! num Mp mtype density young's Poission Yield0 B n C
+! num mtype density young's Poission Yield0 B n C
 2 sjc 8.9d-3 117.0d3 0.31d0 90 392 0.5 0.0 1d-3
 
 !
