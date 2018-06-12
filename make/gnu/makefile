@@ -15,10 +15,10 @@ DataOut.mod : ../../src/DataOut.f90
 DataOut.o : ../../src/DataOut.f90
 	gfortran -c ../../src/DataOut.f90
 
-FFI.mod : ../../src/FFI.F90
+FFI.mod : ../../src/FFI.f90
 	gfortran -c ../../src/FFI.f90
 
-FFI.o : ../../src/FFI.F90
+FFI.o : ../../src/FFI.f90
 	gfortran -c ../../src/FFI.f90
 
 GridData.mod : ../../src/Grid.f90
