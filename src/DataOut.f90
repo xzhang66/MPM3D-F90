@@ -379,21 +379,21 @@ contains
         'DataArray', 'Int32', 'connectivity'
     do p = 1, nb_particle
         pt => particle_list(p)
-        write(iow11, "(A,i5)") indent//indent//indent//indent, p-1
+        write(iow11, "(A,i10)") indent//indent//indent//indent, p-1
     end do
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'connectivity'
 
     ! 'OFFSETS'
     write(iow11,33) indent//indent//indent, 'DataArray', 'Int32', 'offsets'		
     do p = 1, nb_particle
-        write(iow11, "(A,i5)") indent//indent//indent//indent, p
+        write(iow11, "(A,i10)") indent//indent//indent//indent, p
     end do
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'offsets'
 		
     ! 'TYPES'
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'types'
     do p = 1, nb_particle
-        write(iow11, "(A,i5)") indent//indent//indent//indent, iElemType
+        write(iow11, "(A,i10)") indent//indent//indent//indent, iElemType
     end do
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'types'
     
