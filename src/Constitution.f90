@@ -424,10 +424,8 @@ contains
     ieinc = dinc(1)*(sold(1)+sd(1)) + dinc(2)*(sold(2)+sd(2)) +  &
          dinc(3)*(sold(3)+sd(3)) + dinc(4)*(sold(4)+sd(4)) +     &
          dinc(5)*(sold(5)+sd(5)) + dinc(6)*(sold(6)+sd(6))
-    
-    ieinc = ieinc - 2.0*bqf*(dinc(1)+dinc(2)+dinc(3))
 
-    iener = iener + 0.25*ieinc*vavg + dvol*sm    ! (Eq: 5.15)
+    iener = iener + 0.25*ieinc*vavg + dvol*(sm - 2.0*bqf)    ! (Eq: 5.15)
 
     specen = iener / vol0_
 
