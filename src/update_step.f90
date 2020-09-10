@@ -358,6 +358,7 @@ subroutine Lagr_NodContact()
   type(GridNodeProperty), POINTER :: gd2
   type(ContactGridNodeProperty), POINTER :: CP1
   type(ContactGridNodeProperty), POINTER :: CP2
+  type(GridNode), POINTER :: node
 
   tot_cont_for = 0.0 ! the total contact force between of bodies
 
@@ -367,6 +368,7 @@ subroutine Lagr_NodContact()
      CP2 =>  CP_list(2,n)
      gd1 => grid_list(1, n)
      gd2 => grid_list(2, n)
+	 node => node_list(n)
 
      ! recalculate the nodal normal direction    
      ! if normbody 0 then using average method; 
@@ -437,14 +439,32 @@ subroutine Lagr_NodContact()
         else 
            cforce = nomforce*CP1%ndir
         end if
-
-        ! add contact force to nodal force
-        gd1%Fxg = gd1%Fxg - cforce
-        gd2%Fxg = gd2%Fxg + cforce
-
-        ! adjust the nodal component by contact force
-        gd1%Pxg = gd1%Pxg - cforce * Dt
-        gd2%Pxg = gd2%Pxg + cforce * Dt
+		
+		if (.not. node%Fix_x) then
+			! add contact force to nodal force
+            gd1%Fxg(1) = gd1%Fxg(1) - cforce(1)
+            gd2%Fxg(1) = gd2%Fxg(1) + cforce(1)
+            
+			! adjust the nodal component by contact force
+            gd1%Pxg(1) = gd1%Pxg(1) - cforce(1) * Dt
+            gd2%Pxg(1) = gd2%Pxg(1) + cforce(1) * Dt
+        end if
+		
+		if (.not. node%Fix_y) then
+            gd1%Fxg(2) = gd1%Fxg(2) - cforce(2)
+            gd2%Fxg(2) = gd2%Fxg(2) + cforce(2)
+            
+            gd1%Pxg(2) = gd1%Pxg(2) - cforce(2) * Dt
+            gd2%Pxg(2) = gd2%Pxg(2) + cforce(2) * Dt
+        end if
+		
+		if (.not. node%Fix_z) then
+            gd1%Fxg(3) = gd1%Fxg(3) - cforce(3)
+            gd2%Fxg(3) = gd2%Fxg(3) + cforce(3)
+            
+            gd1%Pxg(3) = gd1%Pxg(3) - cforce(3) * Dt
+            gd2%Pxg(3) = gd2%Pxg(3) + cforce(3) * Dt
+        end if
 
         tot_cont_for = tot_cont_for + cforce
      end if
