@@ -42,6 +42,7 @@ module ParticleData
      real(8):: ie        ! internal energy
      real(8):: mass      ! particle mass
      real(8):: cp        ! sound speed
+     real(8):: q         ! bulk viscosity
   end type Particle
 
   type Body
@@ -119,6 +120,7 @@ contains
     particle_list%SkipThis = .false.
     particle_list%failure  = .false.
     particle_list%icell = 0
+    particle_list%q = 0.0
 
   end subroutine InitParticle
 

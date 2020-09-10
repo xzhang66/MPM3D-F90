@@ -62,6 +62,6 @@ module MaterialData
             DetoZ(maxDeto) = 0.0    
 
   ! artificial bulk viscosity coefficients
-  real(8):: bq1=0.0, bq2=0.0    
+  real(8):: bq1=1.5, bq2=0.06   
 
 end module MaterialData

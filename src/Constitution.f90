@@ -157,6 +157,8 @@ contains
     sig(6) = sd(6)
 
     sold = sd    ! cauchy stress at time step t
+    
+    bqf = 0.0    ! bulk viscosity
 
     ! Select material model
 
@@ -280,6 +282,7 @@ contains
 
     particle_list(p)%ie = iener
     particle_list(p)%cp = cp
+    particle_list(p)%q = bqf
 
   end subroutine Constitution
 
@@ -393,7 +396,13 @@ contains
     implicit none
 
     real:: vavg
-
+    
+    ! bulk viscosity
+    if(sm < 0) then
+        call bulkq()
+    end if
+    ieinc = ieinc - 2.0*bqf*(dinc(1)+dinc(2)+dinc(3))
+    
     vavg = vol_ + vold
     iener = iener + 0.25d0*ieinc*vavg ! (Eq. 5.10)
 
@@ -415,6 +424,8 @@ contains
     ieinc = dinc(1)*(sold(1)+sd(1)) + dinc(2)*(sold(2)+sd(2)) +  &
          dinc(3)*(sold(3)+sd(3)) + dinc(4)*(sold(4)+sd(4)) +     &
          dinc(5)*(sold(5)+sd(5)) + dinc(6)*(sold(6)+sd(6))
+    
+    ieinc = ieinc - 2.0*bqf*(dinc(1)+dinc(2)+dinc(3))
 
     iener = iener + 0.25*ieinc*vavg + dvol*sm    ! (Eq: 5.15)
 
@@ -977,8 +988,10 @@ contains
        A = c1*mu
        B = 0
     end if
-
-    call bulkq()
+    
+    if(sm < 0) then
+        call bulkq()
+    end if
     call hieupd()
 
     pnew = (A + B * specen) / (1 + B * dvol / vol0_) !(Eq: 5.18)
