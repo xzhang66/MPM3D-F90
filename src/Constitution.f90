@@ -38,6 +38,7 @@ module MaterialModel
 
   real(8):: dinc(6)   ! strain increment
   real(8):: sm        ! Mean stress
+  real(8):: smold     ! mean stress of last step
   real(8):: sd(6)     ! deviatoric stress      
   real(8):: sig(6)    ! stress components        
   real(8):: sold(6)   ! deviatoric stress of step n
@@ -63,6 +64,9 @@ module MaterialModel
   real(8):: rv        ! relative volume rv = vol_/vol0_
   real(8):: bfac      ! burn fraction
   real(8):: cp        ! sound speed
+  
+  real(8):: DMG       ! Damage
+  real(8):: oldDMG    ! Damage of last step
 
 contains
 
@@ -91,6 +95,7 @@ contains
     real(8):: mp_
     real(8):: ltim
     logical:: failure
+    real(8):: DMGRatio
 
     ! Pick parameters    
     dinc = de
@@ -135,12 +140,15 @@ contains
     specen = iener / vol0_
 
 
-    young_ = young_*(1.0-particle_list(p)%DMG+epsilon(1.0d0))
+    DMG = particle_list(p)%DMG
+    oldDMG = DMG
+    young_ = young_*(1.0-DMG+epsilon(1.0d0))
     G2 = young_ / (1 + poisson_)
     K3 = young_ / (1 - 2*poisson_)
     PlaMod = young_ * tangmod_ / (young_ - tangmod_)
 
     sm = particle_list(p)%SM           ! Mean stress
+    smold = particle_list(p)%SM        ! Mean stress of last step
 
     sd(1) = particle_list(p)%SDxx      ! deviatoric stress
     sd(2) = particle_list(p)%SDyy
@@ -220,8 +228,36 @@ contains
        ! john: Johnson-Cook plasticity model with failure
        call sigrot(vort, sig, sm, sd)
        if (.not.particle_list(p)%failure) then
-          call M3DM8(mat_list(mid), DT, tmprt)
+          call M3DM8(mat_list(mid), DT, tmprt, failure)
           call seleos(failure)
+          
+          if (epeff_ .gt. mat_list(mid)%epf) then
+             epeff_ = mat_list(mid)%epf + 0.0000001
+             DMG = 1.0
+             failure = .true.
+          else
+             DMG = oldDMG + depeff/mat_list(mid)%epf
+             if (DMG >= 1.0) DMG = 1.0
+             DMGRatio = (1 - DMG)/(1 - oldDMG)
+             sd = sd*DMGRatio
+             
+             if(abs(DMG - 1.0) < 1e-5) failure = .true.
+          end if
+       
+          if (failure .and. sm < 0) then
+             sm = 0.0
+             bqf = 0.0
+             particle_list(p)%VOL = vold
+          end if
+          
+          ! The particle failed in this step
+          if(failure) then
+             ! Internal energy should be recalculated
+             sd = 0.0
+             iener = iener - ieinc + dvol*(smold + sm - 2*bqf)
+          end if
+          particle_list(p)%failure = failure
+       
           specheat_ = mat_list(mid)%SpecHeat
           particle_list(p)%celsius_t = particle_list(p)%celsius_t &
                                        + seqv*depeff/den_/specheat_
@@ -229,17 +265,6 @@ contains
           call M3DM7()
           call seleos(failure)
        end if
-
-       if (epeff_ .gt. mat_list(mid)%epf) then
-          epeff_ = mat_list(mid)%epf + 0.0000001
-          failure = .true.
-       end if
-       
-       if (failure .and. sm < 0) then
-          sm=0.0
-          particle_list(p)%VOL = vold
-       end if
-       particle_list(p)%failure = failure
 
     case(8) 
        ! hiex: High Explosive burn
@@ -409,7 +434,7 @@ contains
   end subroutine lieupd
 
 
-  subroutine hieupd()
+  subroutine hieupd(failure)
 !------------------------------------------------------------------
 !-  Purpose                                                       -
 !-      Update energy for material models calling a EOS           -
@@ -417,15 +442,22 @@ contains
 !-      Section 5.1                                               -
 !------------------------------------------------------------------
     implicit none
+    logical:: failure
     real:: vavg
 
-    vavg = vol_ + vold
+    if(failure) then
+        ieinc = dvol*(smold - 2.0*bqf)
+    else
+        vavg = vol_ + vold
 
-    ieinc = dinc(1)*(sold(1)+sd(1)) + dinc(2)*(sold(2)+sd(2)) +  &
-         dinc(3)*(sold(3)+sd(3)) + dinc(4)*(sold(4)+sd(4)) +     &
-         dinc(5)*(sold(5)+sd(5)) + dinc(6)*(sold(6)+sd(6))
+        ieinc = dinc(1)*(sold(1)+sd(1)) + dinc(2)*(sold(2)+sd(2)) +  &
+            dinc(3)*(sold(3)+sd(3)) + dinc(4)*(sold(4)+sd(4)) +     &
+            dinc(5)*(sold(5)+sd(5)) + dinc(6)*(sold(6)+sd(6))
+    
+        ieinc = 0.25*ieinc*vavg + dvol*(smold - 2.0*bqf)
+    end if
 
-    iener = iener + 0.25*ieinc*vavg + dvol*(sm - 2.0*bqf)    ! (Eq: 5.15)
+    iener = iener + ieinc   ! (Eq: 5.15)
 
     specen = iener / vol0_
 
@@ -713,7 +745,7 @@ contains
 
   end subroutine M3DM7
 
-  subroutine M3DM8(mat, DT, tmprt)
+  subroutine M3DM8(mat, DT, tmprt, failure)
 !------------------------------------------------------------------
 !-  Purpose                                                       -
 !-      Johnson-Cook plastic material model (john)                -
@@ -727,7 +759,9 @@ contains
 
     real(8), intent(in) :: DT, tmprt
     type(material), intent(in) :: mat
+    logical:: failure
     real(8):: Bjc, njc, Cjc, mjc, epso, tstar
+    real(8):: EFFS, EPSF, srate
 
     Bjc = mat%B_jc
     njc = mat%n_jc
@@ -746,22 +780,42 @@ contains
     if (seqv .GT. sig_y_) then
        depeff = (seqv - sig_y_) / (1.5e0*G2 + PlaMod)
        epeff_ = epeff_ + depeff
+       
+       EFFS = 2.0*(dinc(1)**2 + dinc(2)**2 + dinc(3)**2 + 0.5*(&
+            dinc(4)**2 + dinc(5)**2 + dinc(6)**2))/3.0
+       
+       EFFS = log(sqrt(EFFS)/epso/DT)
 
        tstar = (tmprt-mat%roomt)/(mat%melt-mat%roomt)
+       if(tstar > 1.0) then
+          tstar = 1.0
+          failure = .true.
+       else
+          if(tstar < 0.0) tstar = 0.0
+       end if
+       
+       
+       srate = depeff/epso/DT
+       if(srate < 0.001) srate = 0.001
 
        sig_y_ = (yield0_ + Bjc*(epeff_**njc)) * &
-                (1 + Cjc*log(depeff/epso/DT)) * (1 - tstar**mjc)
+                (1 + Cjc*log(srate)) * (1 - tstar**mjc)
+                
+       if(sig_y_ .GT. seqv) then
+            epeff_ = epeff_ - depeff
+            depeff = 0.0
+       else
+            ratio = sig_y_/seqv
 
-       ratio = sig_y_/seqv
+            sd(1) = sd(1)*ratio
+            sd(2) = sd(2)*ratio
+            sd(3) = sd(3)*ratio
+            sd(4) = sd(4)*ratio
+            sd(5) = sd(5)*ratio
+            sd(6) = sd(6)*ratio
 
-       sd(1) = sd(1)*ratio
-       sd(2) = sd(2)*ratio
-       sd(3) = sd(3)*ratio
-       sd(4) = sd(4)*ratio
-       sd(5) = sd(5)*ratio
-       sd(6) = sd(6)*ratio
-
-       seqv = seqv*ratio
+            seqv = seqv*ratio
+       end if
     end if
 
   end subroutine M3DM8
@@ -941,11 +995,13 @@ contains
     A = c0 + mu * (c1 + mu * (c2 + mu * c3))
     B = c4 + mu * (c5 + mu * c6)
 
-    call hieupd()
+    call hieupd(failure)
 
     pnew = (A + B * specen) / (1 + B * dvol / vol0_) !(Eq: 5.18)
     
     if(failure .and. pnew < 0) pnew=0.0 
+    
+    ieinc = ieinc - dvol * pnew
 
     iener = iener - dvol * pnew        ! (Eq: 5.14)
 
@@ -990,7 +1046,7 @@ contains
     if(sm < 0) then
         call bulkq()
     end if
-    call hieupd()
+    call hieupd(failure)
 
     pnew = (A + B * specen) / (1 + B * dvol / vol0_) !(Eq: 5.18)
 
@@ -1044,7 +1100,7 @@ contains
     A = wdr1v*er1v + wdr2v*er2v + bqf
     B = w1/rv
 
-    call hieupd()
+    call hieupd(failure)
 
     A = A * bfac
     B = B * bfac
