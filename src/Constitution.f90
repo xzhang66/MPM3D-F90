@@ -194,6 +194,10 @@ contains
        ! john: Johnson-Cook plasticity model
        call sigrot(vort, sig, sm, sd)
        call M3DM4(mat_list(mid), DT, tmprt)
+       if(sm < 0) then
+            call bulkq()
+       end if
+       ieinc = ieinc - 2.0*bqf*(dinc(1)+dinc(2)+dinc(3))
        call lieupd()
        ! call seleos()
 
@@ -214,15 +218,31 @@ contains
        if (.not.particle_list(p)%failure) then
           call M3DM5(mat_list(mid), DT)    
           call seleos(failure)
+          
+          if (epeff_ .gt. mat_list(mid)%epf) then
+             epeff_ = mat_list(mid)%epf + 0.0000001
+             failure = .true.
+          end if
+          
+          ! The particle failed in this step
+          if (failure .and. sm < 0) then
+             sm = 0.0
+             bqf = 0.0
+             particle_list(p)%VOL = vold
+          end if
+          
+          if(failure) then
+             ! Internal energy should be recalculated
+             sd = 0.0
+             iener = iener - ieinc + dvol*(smold + sm - 2*bqf)
+          end if
+          particle_list(p)%failure = failure
        else
           call M3DM7()
           call seleos(failure)
        end if
 
-       if (epeff_ .gt. mat_list(mid)%epf) then
-          epeff_ = mat_list(mid)%epf + 0.0000001
-          particle_list(p)%failure = .true.
-       end if
+       
 
     case(7) 
        ! john: Johnson-Cook plasticity model with failure
@@ -243,14 +263,14 @@ contains
              
              if(abs(DMG - 1.0) < 1e-5) failure = .true.
           end if
-       
+          
+          ! The particle failed in this step
           if (failure .and. sm < 0) then
              sm = 0.0
              bqf = 0.0
              particle_list(p)%VOL = vold
           end if
           
-          ! The particle failed in this step
           if(failure) then
              ! Internal energy should be recalculated
              sd = 0.0
@@ -608,7 +628,7 @@ contains
 
     real(8), intent(in) :: DT, tmprt
     type(material), intent(in) :: mat
-    real(8):: Bjc, njc, Cjc, mjc, epso, tstar
+    real(8):: Bjc, njc, Cjc, mjc, epso, tstar, srate
 
     ieinc = sig(1)*dinc(1) + sig(2)*dinc(2) + sig(3)*dinc(3) +  &
          sig(4)*dinc(4) + sig(5)*dinc(5) + sig(6)*dinc(6)
@@ -635,21 +655,29 @@ contains
        epeff_ = epeff_ + depeff
 
        tstar = (tmprt-mat%roomt)/(mat%melt-mat%roomt)
-
+       
+       srate = depeff/epso/DT
+       if(srate < 0.001) srate = 0.001
+       
        ! (Eq: 5.107)
 	   sig_y_ = (yield0_ + Bjc*(epeff_**njc)) * &
-                (1 + Cjc*log(depeff/epso/DT)) * (1 - tstar**mjc)
+                (1 + Cjc*log(srate)) * (1 - tstar**mjc)
 
-       ratio = sig_y_/seqv    ! (Eq: 5.100)
+       if(sig_y_ .GT. seqv) then
+            epeff_ = epeff_ - depeff
+            depeff = 0.0
+       else
+            ratio = sig_y_/seqv    ! (Eq: 5.100)
 
-       sd(1) = sd(1)*ratio    ! (Eq: 5.101)
-       sd(2) = sd(2)*ratio
-       sd(3) = sd(3)*ratio
-       sd(4) = sd(4)*ratio
-       sd(5) = sd(5)*ratio
-       sd(6) = sd(6)*ratio
+            sd(1) = sd(1)*ratio    ! (Eq: 5.101)
+            sd(2) = sd(2)*ratio
+            sd(3) = sd(3)*ratio
+            sd(4) = sd(4)*ratio
+            sd(5) = sd(5)*ratio
+            sd(6) = sd(6)*ratio
 
-       seqv = seqv*ratio      ! (Eq: 5.102)
+            seqv = seqv*ratio      ! (Eq: 5.102)
+       end if
     end if
 
     call elastic_p()
@@ -676,7 +704,7 @@ contains
 
     real(8), intent(in) :: DT
     type(material), intent(in) :: mat
-    real(8):: Bjc, njc, Cjc, epso
+    real(8):: Bjc, njc, Cjc, epso, srate
 
     Bjc = mat%B_jc
     njc = mat%n_jc
@@ -694,20 +722,28 @@ contains
     if (seqv .GT. sig_y_) then
        depeff = (seqv - sig_y_) / (1.5e0*G2 + PlaMod)
        epeff_ = epeff_ + depeff
+       
+       srate = depeff/epso/DT
+       if(srate < 0.001) srate = 0.001
 
        sig_y_ = (yield0_ + Bjc*(epeff_**njc)) * &
-                (1 + Cjc*log(depeff/epso/DT))
+                (1 + Cjc*log(srate))
+       
+       if(sig_y_ .GT. seqv) then
+            epeff_ = epeff_ - depeff
+            depeff = 0.0
+       else
+            ratio = sig_y_/seqv
 
-       ratio = sig_y_/seqv
+            sd(1) = sd(1)*ratio
+            sd(2) = sd(2)*ratio
+            sd(3) = sd(3)*ratio
+            sd(4) = sd(4)*ratio
+            sd(5) = sd(5)*ratio
+            sd(6) = sd(6)*ratio
 
-       sd(1) = sd(1)*ratio
-       sd(2) = sd(2)*ratio
-       sd(3) = sd(3)*ratio
-       sd(4) = sd(4)*ratio
-       sd(5) = sd(5)*ratio
-       sd(6) = sd(6)*ratio
-
-       seqv = seqv*ratio
+            seqv = seqv*ratio
+       end if
     end if
 
   end subroutine M3DM5
@@ -761,7 +797,7 @@ contains
     type(material), intent(in) :: mat
     logical:: failure
     real(8):: Bjc, njc, Cjc, mjc, epso, tstar
-    real(8):: EFFS, EPSF, srate
+    real(8):: srate
 
     Bjc = mat%B_jc
     njc = mat%n_jc
@@ -780,11 +816,6 @@ contains
     if (seqv .GT. sig_y_) then
        depeff = (seqv - sig_y_) / (1.5e0*G2 + PlaMod)
        epeff_ = epeff_ + depeff
-       
-       EFFS = 2.0*(dinc(1)**2 + dinc(2)**2 + dinc(3)**2 + 0.5*(&
-            dinc(4)**2 + dinc(5)**2 + dinc(6)**2))/3.0
-       
-       EFFS = log(sqrt(EFFS)/epso/DT)
 
        tstar = (tmprt-mat%roomt)/(mat%melt-mat%roomt)
        if(tstar > 1.0) then
@@ -1051,7 +1082,8 @@ contains
     pnew = (A + B * specen) / (1 + B * dvol / vol0_) !(Eq: 5.18)
 
     if(failure .and. pnew < 0) pnew=0.0 
-
+    
+    ieinc = ieinc - dvol * pnew
     iener = iener - dvol * pnew        ! (Eq: 5.14)
 
     sm = -pnew
