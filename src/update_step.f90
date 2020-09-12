@@ -230,9 +230,9 @@ subroutine GridMomentumUpdate()
         ! Particle p is out of the computational region
         if (icell < 0) cycle    
 
-        sxx = pt%SM + pt%SDxx   ! Stresses
-        syy = pt%SM + pt%SDyy
-        szz = pt%SM + pt%SDzz
+        sxx = pt%SM - pt%q + pt%SDxx   ! Stresses
+        syy = pt%SM - pt%q + pt%SDyy
+        szz = pt%SM - pt%q + pt%SDzz
         sxy = pt%SDxy
         syz = pt%SDyz
         sxz = pt%SDxz
