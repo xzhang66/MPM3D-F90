@@ -197,6 +197,11 @@ contains
                 write(iow1,"(e12.4)", advance='no') -pt%SM
              case(5) !vol
                 write(iow1,"(e12.4)", advance='no') pt%vol
+             case(6) !engk
+                write(iow1,"(e12.4)", advance='no') &
+                    0.5*pt%mass*(pt%VXp(1)**2+pt%VXp(2)**2+pt%VXp(3)**2)
+             case(7) !engi
+                write(iow1,"(e12.4)", advance='no') pt%ie
              case(8) !vx
                 write(iow1,"(e12.4)", advance='no') pt%VXp(1)
              case(9) !vy
