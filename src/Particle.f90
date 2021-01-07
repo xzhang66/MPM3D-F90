@@ -124,7 +124,7 @@ contains
 
   end subroutine InitParticle
 
-  subroutine InitBody
+  subroutine InitBody()
 !------------------------------------------------------------------
 !    purpose: initialize body_list                                -
 !    used after body_list space allocated                         -
