@@ -134,8 +134,8 @@ contains
 
     write(iow03,"(4e12.4)") CurrentTime, EngKinetic+EngInternal, &
                             EngKinetic, EngInternal
-    write(iow04,"(4e12.4)") CurrentTime, Mombody1(1), Mombody1(2), &
-                            Mombody1(3)
+    write(iow04,"(4e12.4)") CurrentTime, Momentum(1), Momentum(2), &
+                            Momentum(3)
 
     if (contact) then
        ! output contact force

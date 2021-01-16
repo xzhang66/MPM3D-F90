@@ -85,8 +85,8 @@ module ParticleData
   real(8):: EngInternal = 0.0   ! Internal energy
   real(8):: EngKinetic = 0.0    ! Kinetic energy
   real(8):: Momentum(3) 
-  real(8):: Mombody1(3)
-  real(8):: Mombody2(3)
+! real(8):: Mombody1(3)
+! real(8):: Mombody2(3)
 
 contains
 
