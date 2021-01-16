@@ -329,7 +329,7 @@ contains
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vx'
     do p = 1, nb_particle
         pt => particle_list(p)
-        write(iow11, "(A,e12.4)") indent//indent//indent//indent, -pt%VXp(1)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%VXp(1)
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'vx'
 
@@ -337,7 +337,7 @@ contains
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vy'
     do p = 1, nb_particle
         pt => particle_list(p)
-        write(iow11, "(A,e12.4)") indent//indent//indent//indent, -pt%VXp(2)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%VXp(2)
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'vy'
 		
@@ -345,7 +345,7 @@ contains
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vz'
     do p = 1, nb_particle
         pt => particle_list(p)
-        write(iow11, "(A,e12.4)") indent//indent//indent//indent, -pt%VXp(3)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%VXp(3)
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'vz'
 
