@@ -166,6 +166,9 @@ contains
      pt%VXp(3)=0
     end do
 
+    ! set the current kinetic energy
+    EngKinetic = 0
+
   endif
 
   end subroutine dynamicRelaxationDamping
