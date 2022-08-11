@@ -23,6 +23,7 @@ module ParticleData
   type Particle
      real(8):: XX(3)     ! particle position at time step t+1
      real(8):: Xp(3)     ! particle position at time step t
+     real(8):: Xo(3)     ! particle position at time step t=0 
      real(8):: VXp(3)    ! particle velocity
      real(8):: FXp(3)    ! load
 

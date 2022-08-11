@@ -686,6 +686,13 @@ contains
         write(*,"(a,i12)") 'particles read:', parCounter
     end if 
 
+    ! set particle initial position
+    do p = 1, nb_particle
+      particle_list(p)%Xo(1) = particle_list(p)%Xp(1)
+      particle_list(p)%Xo(2) = particle_list(p)%Xp(2)
+      particle_list(p)%Xo(3) = particle_list(p)%Xp(3)
+    end do
+
   end subroutine SetParticle
 
   subroutine setskip(p)

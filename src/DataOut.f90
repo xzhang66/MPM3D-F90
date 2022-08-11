@@ -349,6 +349,30 @@ contains
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'vz'
 
+    ! disx
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'disx'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%Xp(1)-pt%Xo(1)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'disx'
+
+    ! disy
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'disy'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%Xp(2)-pt%Xo(2)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'disy'
+
+    ! disz
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'disz'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%Xp(3)-pt%Xo(3)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'disz'
+
     ! vol
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vol'
     do p = 1, nb_particle
