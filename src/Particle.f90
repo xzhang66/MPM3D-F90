@@ -75,6 +75,7 @@ module ParticleData
   logical:: GIMP = .false.      ! use cpGIMP method? 
   logical:: contact = .false.   ! use contact method?
   logical:: Gravity = .false.   ! set gravity?
+  logical:: DR_DAMPING = .false. ! use dynamic relaxation techniques for quasi static solution?
 
   integer:: istep = 0           ! Current time step
   real(8):: DT = 0              ! time step interval
@@ -83,7 +84,8 @@ module ParticleData
   real(8):: DTScale = 0.9    ! time step size factor (<= 1.0)
 
   real(8):: EngInternal = 0.0   ! Internal energy
-  real(8):: EngKinetic = 0.0    ! Kinetic energy
+  real(8):: EngKinetic = 0.0    ! Current Kinetic energy
+  real(8):: EngKinetic_prev = 0.0 ! Previous Kinetic energy
   real(8):: Momentum(3) 
 ! real(8):: Mombody1(3)
 ! real(8):: Mombody2(3)
@@ -138,6 +140,35 @@ contains
 
   end subroutine InitBody
 
+  subroutine dynamicRelaxationDamping()
+!-------------------------------------------------------------------
+!-   purpose: verify kinematic energy for static solution damping  -
+!----------------------------------------------------------------- -
+  implicit none
+  type(Particle), POINTER :: pt
+  real(8)::delta_kinetic_energy
+  integer :: p    ! loop counter
+
+  if(istep .eq. 0) then
+    EngKinetic_prev=0
+    return
+  endif
+
+  delta_kinetic_energy = EngKinetic - EngKinetic_prev
+
+  if(delta_kinetic_energy .le. 0d0) then
+
+    do p = 1, nb_particle
+     pt => particle_list(p)
+     pt%VXp(1)=0
+     pt%VXp(2)=0
+     pt%VXp(3)=0
+    end do
+
+  endif
+
+  end subroutine dynamicRelaxationDamping
+
   subroutine calcEnergy()
 !-------------------------------------------------------------------
 !-   purpose: calculate kinematic energy  and internal energy      -
@@ -149,6 +180,8 @@ contains
   integer :: p    ! loop counter
   integer :: mat
   real(8)::delta_EngKinetic,iener
+  
+  EngKinetic_prev = EngKinetic ! set previous kinetic energy
 
   EngKinetic  = 0.0      ! initial Kinetic energy 
   EngInternal = 0.0      ! initial internal energy
