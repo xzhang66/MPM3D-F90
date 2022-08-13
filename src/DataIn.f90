@@ -112,14 +112,14 @@ contains
     integer key, i, tempI
     logical:: updateMethod = .false.
 
-    integer,parameter:: nbkw = 35
+    integer,parameter:: nbkw = 36
     character(4),parameter:: kw(nbkw) = (/ &
          'endi','mpm3','nbmp','endt','grid','spx ', &
          'spy ','spz ','dcel','dtsc','outt','rptt', &
          'fixe','nmat','mate','part','musl','jaum', &
          'load','velo','outr','curv','seos','pt2d', &
          'curx','deto','tecp','bulk','gimp','cont', &
-         'usf ','usl ','nbco','nbbo','para'         &
+         'usf ','usl ','nbco','nbbo','para','drda' &
          /)
 
     do while(.true.)
@@ -315,6 +315,9 @@ contains
            
        case(35)   ! para - Write results to ParaView
           WriteParaView = .true.
+
+       case(36)   ! drda - Activate damping for static solution using dynamic relaxation
+          DR_DAMPING = .true.
 
        case default ! error
           stop 'STOP - Error encountered in reading data'
@@ -682,6 +685,13 @@ contains
     if(bodyCounter == nb_body) then
         write(*,"(a,i12)") 'particles read:', parCounter
     end if 
+
+    ! set particle initial position
+    do p = 1, nb_particle
+      particle_list(p)%Xo(1) = particle_list(p)%Xp(1)
+      particle_list(p)%Xo(2) = particle_list(p)%Xp(2)
+      particle_list(p)%Xo(3) = particle_list(p)%Xp(3)
+    end do
 
   end subroutine SetParticle
 

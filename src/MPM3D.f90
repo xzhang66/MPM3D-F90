@@ -108,6 +108,10 @@ program MPM3D
 
      call calcEnergy()              ! Calculate kinetic energy
 
+     if(DR_DAMPING) then
+        call dynamicRelaxationDamping() ! Verify damping for quasi static solution
+     endif
+
      call cpu_time( t_end )
      t_cpu = t_cpu + t_end - t_begin
 
