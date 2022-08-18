@@ -740,6 +740,7 @@ contains
           particle_list(inode)%FXp(1) = GetReal()
           particle_list(inode)%FXp(2) = GetReal()
           particle_list(inode)%FXp(3) = GetReal()
+          
        case(3)    ! by body
           ibody = GetInt()    ! body number
           fxp = GetReal()

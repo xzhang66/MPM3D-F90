@@ -373,6 +373,30 @@ contains
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'disz'
 
+    ! fxpx
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'fxpx'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%FXp(1)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'fxpx'
+
+    ! fxpy
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'fxpy'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%FXp(2)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'fxpy'
+
+    ! fxpz
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'fxpz'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%FXp(3)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'fxpz'
+
     ! vol
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vol'
     do p = 1, nb_particle
