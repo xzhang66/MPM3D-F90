@@ -719,27 +719,30 @@ contains
     use FFI
     implicit none
 
-    integer k, inode, i, ibody
+    integer k, ipart, i, ibody
     real(8):: fxp, fyp, fzp
-    integer,parameter:: nbkw = 4
+    integer,parameter:: nbkw = 5
     character(4),parameter:: kw(nbkw) = &
-                             (/'endl','node','body','grav' /)
+                             (/'endl','part','body','grav','node' /)
 
     if(nb_body.eq.0) then
        stop '*** Error *** nbby must be defined !'
     end if
 
     do while(.true.)
+       
        k = keyword(kw,nbkw)
        select case(k)
+       
        case(1)    ! end load
           exit
 
-       case(2)    ! by node 
-          inode = GetInt()
-          particle_list(inode)%FXp(1) = GetReal()
-          particle_list(inode)%FXp(2) = GetReal()
-          particle_list(inode)%FXp(3) = GetReal()
+       case(2)    ! by particle 
+          ipart = GetInt()
+          particle_list(ipart)%FXp(1) = GetReal()
+          particle_list(ipart)%FXp(2) = GetReal()
+          particle_list(ipart)%FXp(3) = GetReal()
+          
        case(3)    ! by body
           ibody = GetInt()    ! body number
           fxp = GetReal()
@@ -759,6 +762,9 @@ contains
           body_list(ibody)%Gravp(2) = GetReal()
           body_list(ibody)%Gravp(3) = GetReal()
 
+       case (5) ! Legacy keyword
+         write(*,*) '*** Error *** : Please use the keyword part instead of node to apply a load to a particle'
+       
        case default    ! error
           call ErrorMsg()
           stop 'error GetLoad'
