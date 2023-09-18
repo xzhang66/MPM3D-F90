@@ -1,3 +1,4 @@
+## About
 **MPM3D-F90** is the simplified FORTRAN 90 version of [MPM3D](http://comdyn.hy.tsinghua.edu.cn/english/mpm3d), and servers as the companion open source code for our MPM books: 
 
 1. X Zhang, Z Chen, Y Liu. [**The Material Point Method** - A Continuum-Based Particle Method for Extreme Loading Cases](http://store.elsevier.com/The-Material-Point-Method/Xiong-Zhang/isbn-9780124077164/). Academic Press, 2016; 
@@ -10,8 +11,7 @@ The MPM3D-F90 can be obtained from GitHub at **https://github.com/xzhang66/MPM3D
 
 Please cite our books and related publications in your publication if MPM3D-F90 or MPM3D is used in your work. Here is the **[List of our publications in Material Point Method](http://comdyn.hy.tsinghua.edu.cn/103-achievements/mpm3d-en/553-mpm-publications).**
 
-------
-
+## Source code organization
 The code is organized as:
 
 **src**:  Souce files (MPM3D.f90, Particle.f90, DataIn.f90, DataOut.f90, FFI.f90, Grid.f90, Material.f90, update_step.f90, Constitution.f90)
@@ -33,3 +33,13 @@ The code is organized as:
 > **PeneOgive.mpm**:  Penetration of a ogive projectile
 
 > **Slopefail.mpm**:  Failure of slope
+
+## Compile and baisc usage under Linux
+
+Under Linux, you can compile and run an example by the following code:
+```sh
+cd MPM3D-F90
+cmake .
+make
+./mpm3d Data/Deto1k.mpm
+```
