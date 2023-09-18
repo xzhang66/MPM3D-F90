@@ -9,7 +9,7 @@ Please refer to these two books for detailed explanation about its source codes 
 
 The MPM3D-F90 can be obtained from GitHub at **https://github.com/xzhang66/MPM3D-F90**. You are welcome to share your improvements and enhancements to MPM3D-F90, or share your input data files and simulation results. Please send you feedback to me at [xzhang@tsinghua.edu.cn](mailto:xzhang@tsinghua.edu.cn).
 
-Please cite our books and related publications in your publication if MPM3D-F90 or MPM3D is used in your work. Here is the **[List of our publications in Material Point Method](http://comdyn.hy.tsinghua.edu.cn/103-achievements/mpm3d-en/553-mpm-publications).**
+Please cite our books and related publications in your publication if MPM3D-F90 or MPM3D is used in your work. Here is the **[List of our publications in Material Point Method](http://comdyn.hy.tsinghua.edu.cn/english/mpm3d?view=article&id=553).**
 
 ## Source code organization
 The code is organized as:
