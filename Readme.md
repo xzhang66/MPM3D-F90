@@ -34,12 +34,20 @@ The code is organized as:
 
 > **Slopefail.mpm**:  Failure of slope
 
-## Compile and baisc usage under Linux
+## Compile and baisc usage
 
-Under Linux, you can compile and run an example by the following code:
+Under **Linux**, you can compile and run an example by the following code:
 ```sh
 cd MPM3D-F90
 cmake .
+make
+./mpm3d Data/Deto1k.mpm
+```
+
+In **Windows**, you can install cygwin (https://www.cygwin.com/) and after adding cygwin64/bin to the path, you can compile the program as:
+```sh
+cd .\make\gnu\
+make clean
 make
 ./mpm3d Data/Deto1k.mpm
 ```
