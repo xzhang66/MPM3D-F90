@@ -97,7 +97,7 @@ contains
     logical:: failure
     real(8):: DMGRatio
 
-    ! Pick parameters    
+    ! Pick parameters
     dinc = de
 
     ! Volume at time step t

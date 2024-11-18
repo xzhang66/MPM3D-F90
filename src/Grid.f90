@@ -38,6 +38,22 @@ module GridData
      real(8):: PXg(3)    ! momentum on grid node
      real(8):: FXg(3)    ! internal/external force on gride node
   end type GridNodeProperty
+  
+ type CellData
+     real(8)::Cxg(3)    !the node coordinate of the cell center
+ end type CellData
+ 
+ type CellDataproperty
+     real(8)::Cmg       ! mass on the center node of the cell
+     real(8)::Cpxg(3)   ! momentun on the center node of the cell
+     real(8)::Cfxg(3)   ! total grid force on the center node of the cell
+     real(8)::Cfint(6)  ! internal/external force on the center gride node
+     real(8)::Cfext(3)
+     real(8)::Cvx(3)    ! the velocity of the center node in the t+1/2
+     real(8)::Cax(3)    ! the accleration of the center node in the t+1/2
+     real(8)::Co(6)     ! the strain increment and vorticity increment at the center node
+     real(8)::Cw(3)
+  end type CellDataproperty
 
   type ContactGridNodeProperty
      ! the normal direction of contact grid node
@@ -49,6 +65,8 @@ module GridData
   type(GridNodeProperty), target, allocatable:: grid_list(:,:)
   type(GridNode), target, allocatable:: node_list(:)
   type(ContactGridNodeProperty), target, allocatable:: CP_list(:,:)
+  type(CellData),target,allocatable::cell_list(:)
+  type(CellDataproperty),target,allocatable::cellp_list(:)
   real(8):: fricfa = 0.0    ! the frictional coefficient
   integer:: normbody = 0    ! the flag of computaional normal
   ! the flag of contact type: 0-no,1-langrange,2-penalty
@@ -65,21 +83,26 @@ module GridData
   real(8):: CutOff = 0.0       ! Grid mass cutoff value
 
   integer:: nb_gridnode = 0    ! number of gridnodes
+  integer:: nb_centernode = 0  ! number of the center node of the cell
   integer:: FixS(6) = 0
 
   ! Number of cells
   integer:: NumCell=0, NumCellx=0, NumCelly=0, &
-            NumCellz=0, NumCellxy=0
+            NumCellz=0, NumCellxy=0,CenterNumCell=0,&
+            CenterNumCellx=0,CenterNumCelly=0,CenterNumCellz,&
+            CenterNumCellxy=0
   integer:: NGx, NGy, NGz, NGxy
   ! NumCell * 8 - Define computational grid
-  integer, allocatable:: CellsNode(:,:)    
+  integer, allocatable:: CellsNode(:,:),CenterCellNode(:,:)    
   integer:: nb_InflNode = 8
+  integer:: centernb_InflNode=8
   integer:: InflNode(27)    ! influence node list for each particle
+  integer:: CenterInflNode(8) !influence node list for the Auxiliary grid
   real(8):: rpg(27,3)       ! distance between particle and node
 
   real(8):: iJacobi, iJacobi4, iDCell ! 1/Jacobi
   ! shape function and its derivative
-  real(8), allocatable:: SHP(:), DNDX(:), DNDY(:), DNDZ(:) 
+  real(8), allocatable:: SHP(:), DNDX(:), DNDY(:), DNDZ(:) ,CSHP(:),CDNDX(:),CDNDY(:),CDNDZ(:)
 
   ! sign constant used by NShape
   integer,parameter:: SNX(8) = (/-1, 1, 1, -1, -1, 1, 1, -1/), &
@@ -121,6 +144,41 @@ contains
     end if
 
   end function InWhichCell
+  
+  integer function CenterInWhichCell(xxx)
+! - find the position which the material point in auxiliary grid
+! -----------------------------------------------------------------
+! - Purpose                                                       -
+! -    Determine which cell the point (xxx,yyy,zzz) is located in    -
+! -                                                               -
+! - Input                                                         -
+! -    xxx(3) - Coordinates of a point                             -
+! -                                                               -
+! - Return values                                                 -
+! -    >0 : Cell number in which the point is located (MP)        -
+! -    <0 : point out off the cell                                -
+! -----------------------------------------------------------------
+    implicit none
+    real(8), intent(in):: xxx(3)
+
+    integer ix, iy, iz
+
+    if (xxx(1)<SpanX(1)+DCell/2.0 .or. xxx(1)>SpanX(2)-DCell/2.0 .or. xxx(2)<SpanY(1)+DCell/2.0 .or. &
+        xxx(2)>SpanY(2)-DCell/2.0 .or.xxx(3)<SpanZ(1)+DCell/2.0 .or. xxx(3)>SpanZ(2)-DCell/2.0) then
+       CenterInWhichCell = -1
+       return
+    end if
+
+    ix = int((xxx(1)-SpanX(1)-DCell/2.0)/DCell) + 1
+    iy = int((xxx(2)-SpanY(1)-DCell/2.0)/DCell) + 1
+    iz = int((xxx(3)-SpanZ(1)-DCell/2.0)/DCell) + 1
+    CenterInWhichCell = (iz - 1)*CenterNumCellxy + (iy - 1)*CenterNumCellx + ix
+
+    if(CenterInWhichCell.gt.CenterNumCell .or. CenterInWhichCell.le.0) then
+       CenterInWhichCell = -1
+    end if
+
+  end function CenterInWhichCell
 
 
   subroutine SetGridData()
@@ -133,8 +191,8 @@ contains
 
     implicit none
 
-    integer:: i, j, ix, iy, iz, icell, inode     ! loop counter
-    integer:: NP2, Node1, Node5
+    integer:: i, j, ix, iy, iz, icell, inode,centericell     ! loop counter
+    integer:: NP2, Node1, Node5,CenterNode1,CenterNode5
     character(len=2) Velo
     real(8):: TempV, spx, spy, spz
     real(8):: mat_, mp_
@@ -154,13 +212,20 @@ contains
     NumCellx = int(spx/DCell + 0.5)
     NumCelly = int(spy/DCell + 0.5)
     NumCellz = int(spz/DCell + 0.5)
+    
+    CenterNumCellx=NumCellx-1
+    CenterNumCelly=NumCelly-1
+    CenterNumCellz=NumCellz-1
 
     SpanX(2) = SpanX(1) + NumCellx*DCell
     SpanY(2) = SpanY(1) + NumCelly*DCell
     SpanZ(2) = SpanZ(1) + NumCellz*DCell
 
     NumCellxy = NumCellx * NumCelly
+    CenterNumCellxy=CenterNumCellx*CenterNumCelly
     NumCell = NumCellxy * NumCellz
+    CenterNumCell=CenterNumCellxy*CenterNumCellz
+    nb_centernode=NumCell
 
     NGx = NumCellx + 1
     NGy = NumCelly + 1
@@ -177,6 +242,10 @@ contains
 
     allocate(grid_list(nb_component, nb_gridnode))
     allocate(node_list(nb_gridnode))
+    if(SGMP)then
+    allocate(cell_list(nb_centernode))
+    allocate(cellp_list(nb_centernode))
+    end if
 
     node_list%Fix_x = .false.
     node_list%Fix_y = .false.
@@ -191,6 +260,27 @@ contains
              node_list(i)%Xg(2) = (iy - 1)*DCell + SpanY(1)
              node_list(i)%Xg(3) = (iz - 1)*DCell + SpanZ(1)
 
+        if(Bspline.or.gimp.or.sgmp)then
+                 if (((ix==1.or.ix==2).and.FixS(1)==1).or.((ix==NGx.or.ix==NGx-1).and.FixS(2)==1).or. &
+                 ((iy==1.or.iy==2).and.FixS(3)==1).or.((iy==NGy.or.iy==NGy-1).and.FixS(4)==1).or. &
+                 ((iz==1.or.iz==2).and.FixS(5)==1).or.((iz==NGz.or.iz==NGz-1).and.FixS(6)==1)) then
+                node_list(i)%Fix_x = .true.
+                node_list(i)%Fix_y = .true.
+                node_list(i)%Fix_z = .true.
+             end if
+
+             if (((ix==1.or.ix==2).and.FixS(1)==2).or.((ix==NGx.or.ix==NGx-1).and.FixS(2)==2)) then
+                node_list(i)%Fix_x = .true.
+             end if
+
+             if (((iy==1.or.iy==2).and.FixS(3)==2).or.((iy==NGy.or.iy==NGy-1).and.FixS(4)==2)) then
+                node_list(i)%Fix_y = .true.
+             end if
+
+             if (((iz==1.or.iz==2).and.FixS(5)==2).or.((iz==NGz.or.iz==NGz-1).and.FixS(6)==2)) then
+                node_list(i)%Fix_z = .true.
+             end if
+        end if
              if ((ix==1.and.FixS(1)==1).or.(ix==NGx.and.FixS(2)==1).or. &
                  (iy==1.and.FixS(3)==1).or.(iy==NGy.and.FixS(4)==1).or. &
                  (iz==1.and.FixS(5)==1).or.(iz==NGz.and.FixS(6)==1)) then
@@ -216,6 +306,7 @@ contains
 
     ! create CellsNode
     allocate(CellsNode(NumCell,8))
+    if(SGMP)allocate(CenterCellNode(CenterNumCell,8))
 
     ! loop over every cell to create CellsNode Matrix
     do iz = 1, NumCellz
@@ -232,13 +323,36 @@ contains
              CellsNode(i,6) = Node5 + 1
              CellsNode(i,7) = Node5 + 1 + NGx
              CellsNode(i,8) = Node5 +NGx
+             if(SGMP)cell_list(i)%Cxg=node_list(CellsNode(i,1))%Xg+DCell/2.0
           end do
        end do
     end do
+    
+if(SGMP)then
+    do iz = 1, CenterNumCellz
+       do iy = 1, CenterNumCelly
+          do ix = 1, CenterNumCellx
+             i = (iz - 1)*CenterNumCellxy + (iy - 1)*CenterNumCellx + ix
+             CenterNode1 = (iz - 1)*NumCellxy + (iy - 1)*NumCellx + ix
+             CenterNode5 = CenterNode1 + NumCellxy
+             CenterCellNode(i,1) = CenterNode1
+             CenterCellNode(i,2) = CenterNode1 + 1
+             CenterCellNode(i,3) = CenterNode1 + 1 + NumCellx
+             CenterCellNode(i,4) = CenterNode1 + NumCellx
+             CenterCellNode(i,5) = CenterNode5
+             CenterCellNode(i,6) = CenterNode5 + 1
+             CenterCellNode(i,7) = CenterNode5 + 1 + NumCellx
+             CenterCellNode(i,8) = CenterNode5 +NumCellx
+          end do
+       end do
+    end do
+end if
 
     ! set parameter used in NShape
-    if (GIMP) then
+    if (GIMP.or.Bspline) then
        allocate(SHP(27), DNDX(27), DNDY(27), DNDZ(27))
+    else if(SGMP)then
+       allocate(SHP(8), DNDX(8), DNDY(8), DNDZ(8),CSHP(8),CDNDX(8),CDNDY(8),CDNDZ(8))
     else
        allocate(SHP(8), DNDX(8), DNDY(8), DNDZ(8))
     end if
@@ -262,6 +376,60 @@ contains
     allocate(CP_list(nb_component, nb_gridnode))
 
   end subroutine SetContact_GridNodeData
+  
+  subroutine SGNShape(node1, p, ider)
+!------------------------------------------------------------------
+!- Shape function for SGMP
+!-  Purpose                                                       -
+!-      Evaluate the shape functions and/or their derivatives     -
+!-      at particle p associated with nodes of the cell in        -
+!-      which the particle p is located                           -
+!-  Inputs                                                        -
+!-      node1 - number of the first node of the cell in which the -
+!-              particle p is located                             -
+!-      p     - particle number                                   -
+!-      ider  - flag for shape function and derivative calculation-
+!-              0 - shape functions only                          -
+!-              1 - derivatives only                              -
+!-              2 - both shape functions and their derivatives    -
+!-  Outputs                                                       -
+!-      SHP(8)   - value of shape functions                       -
+!-      DNDX(8)  - value of derivative with respect to            -
+!-                 X of shape function                            -
+!-      DNDY(8)  - value of derivative with respect to            -
+!-                 Y of shape function                            -
+!-      DNDZ(8)  - value of derivative with respect to            -
+!-                 Z of shape function                            -   
+!------------------------------------------------------------------
+    use ParticleData
+    implicit none
+
+    integer, intent(in):: node1, p, ider
+
+    real(8):: x(3) ! nature coordinate ( -1 < x,y,z < 1 )
+    real(8):: sx(8), sy(8), sz(8)
+
+    type(Particle), POINTER :: pt
+    type(CellData), POINTER :: node
+
+    node => cell_list(node1)
+    pt => particle_list(p)
+
+    x = (pt%Xp - node%Cxg)*iJacobi - 1d0
+
+    sx = SNX*x(1) + 1d0    ! 1 + xi(i)  * xi
+    sy = SNY*x(2) + 1d0    ! 1 + eta(i) * eta
+    sz = SNZ*x(3) + 1d0    ! 1 + zeta(i)* zeta
+
+    if (ider .NE. 1) SHP = sx * sy * sz * 0.125d0
+
+    if (ider .NE. 0) then
+       DNDX = SNX * sy * sz * iJacobi4
+       DNDY = SNY * sx * sz * iJacobi4
+       DNDZ = SNZ * sx * sy * iJacobi4
+    end if
+
+  end subroutine SGNShape
 
   subroutine NShape(node1, p, ider)
 !------------------------------------------------------------------
@@ -315,6 +483,49 @@ contains
     end if
 
   end subroutine NShape
+  
+  subroutine CNShape(ider)
+!------------------------------------------------------------------
+!- Shape function for SGMP
+!-  Purpose                                                       -
+!-      Evaluate the shape functions and/or their derivatives     -
+!-      at the centerbode associated with nodes of the cell in        -
+!-      which the particle p is located                           -
+!-  Inputs                                                        -                        -                               -
+!-      ider  - flag for shape function and derivative calculation-
+!-              0 - shape functions only                          -
+!-              1 - derivatives only                              -
+!-              2 - both shape functions and their derivatives    -
+!-  Outputs                                                       -
+!-      CSHP(8)   - value of shape functions                       -
+!-      CDNDX(8)  - value of derivative with respect to            -
+!-                  X of shape function                            -
+!-      CDNDY(8)  - value of derivative with respect to            -
+!-                  Y of shape function                            -
+!-      CDNDZ(8)  - value of derivative with respect to            -
+!-                  Z of shape function                            -   
+!------------------------------------------------------------------
+    use ParticleData
+    implicit none
+
+    integer, intent(in)::  ider
+
+    real(8):: x(3)=(/0,0,0/) ! nature coordinate ( -1 < x,y,z < 1 )
+    real(8):: sx(8), sy(8), sz(8)
+
+    sx = SNX*x(1) + 1d0    ! 1 + xi(i)  * xi
+    sy = SNY*x(2) + 1d0    ! 1 + eta(i) * eta
+    sz = SNZ*x(3) + 1d0    ! 1 + zeta(i)* zeta
+
+    if (ider .NE. 1) CSHP = sx * sy * sz * 0.125d0
+
+    if (ider .NE. 0) then
+       CDNDX = SNX * sy * sz * iJacobi4
+       CDNDY = SNY * sx * sz * iJacobi4
+       CDNDZ = SNZ * sx * sy * iJacobi4
+    end if
+
+  end subroutine CNShape
 
   subroutine NShape_GIMP(p)
 !------------------------------------------------------------------
@@ -620,5 +831,204 @@ contains
 
   end subroutine FindInflNode
 
-end module GridData
 
+    subroutine BFindInflNode(icell)
+!------------------------------------------------------------------
+!-  Purpose: Find Influence Nodes of B-spline for particle p                  -
+!-  Inputs                                                        -                                  -
+!-      icell - cell id containing particle p                     -
+!-  Outputs                                                       -
+!-      InflNode(27)                                              -                                               -
+!------------------------------------------------------------------
+    use ParticleData
+
+    integer, intent(in):: icell
+    integer i
+
+    do i=1, 8
+       InflNode(i) = CellsNode(icell,i)
+    end do
+        ! lower z
+          InflNode(9) = InflNode(1) - NGxy
+          InflNode(10) = InflNode(2) - NGxy
+          InflNode(11) = InflNode(3) - NGxy
+          InflNode(12) = InflNode(4) - NGxy
+
+       ! lower y
+          
+          InflNode(13) = InflNode(9) - NGx
+          InflNode(14) = InflNode(10) - NGx
+          InflNode(15) = InflNode(1) - NGx
+          InflNode(16) = InflNode(2) - NGx
+          InflNode(17) = InflNode(5) - NGx
+          InflNode(18) = InflNode(6) - NGx
+
+        ! lower x 
+             InflNode(19) = InflNode(1) - 1
+             InflNode(20) = InflNode(4) - 1
+             InflNode(21) = InflNode(5) - 1
+             InflNode(22) = InflNode(8) - 1
+             InflNode(23) = InflNode(9) - 1
+             InflNode(24) = InflNode(12) - 1
+             InflNode(25) = InflNode(13) - 1
+             InflNode(26) = InflNode(15) - 1
+             InflNode(27) = InflNode(17) - 1
+             nb_InflNode = 27
+
+    end subroutine BFindInflNode
+
+    
+      subroutine NShape_Bspline(p)
+!------------------------------------------------------------------
+!-  Purpose                                                       -
+!-      Evaluate the shape functions and/or their derivatives     -
+!-      at particle p associated with p's influence nodes (BSplinemethod)  -   
+!-  Inputs                                                        -
+!-      p     - particle number                                   -
+!-  Outputs                                                       -
+!-      SHP(27)   - value of shape functions                      -
+!-      DNDX(27)  - value of derivative with respect to           -
+!-                  X of shape function                           -
+!-      DNDY(27)  - value of derivative with respect to           -
+!-                  Y of shape function                           -
+!-      DNDZ(27)  - value of derivative with respect to           -
+!-                  X of shape function                           -
+!------------------------------------------------------------------
+    use ParticleData
+    implicit none
+
+    integer, intent(in):: p
+    integer:: i, j
+    type(Particle), POINTER :: pt
+    
+    real(8):: sh(3,3) = 0.0, dn(3,3) = 0.0
+    real(8):: r(3)
+
+    pt => particle_list(p)
+
+
+    r = (pt%Xp - node_list(InflNode(1))%Xg) * iDCell*0.2+0.4
+    sh(1,:)=0.5*(3-5*r)**2
+    sh(2,:)=-25*r**2+25*r-5.5
+    sh(3,:)=0.5*(5*r-2)**2
+    !cauclate the SHP
+    SHP(1)=sh(2,1)*sh(2,2)*sh(2,3)
+    SHP(2)=sh(3,1)*sh(2,2)*sh(2,3)
+    SHP(3)=sh(3,1)*sh(3,2)*sh(2,3)
+    SHP(4)=sh(2,1)*sh(3,2)*sh(2,3)
+    SHP(5)=sh(2,1)*sh(2,2)*sh(3,3)
+    SHP(6)=sh(3,1)*sh(2,2)*sh(3,3)
+    SHP(7)=sh(3,1)*sh(3,2)*sh(3,3)
+    SHP(8)=sh(2,1)*sh(3,2)*sh(3,3)
+    SHP(9)=sh(2,1)*sh(2,2)*sh(1,3)
+    SHP(10)=sh(3,1)*sh(2,2)*sh(1,3)
+    SHP(11)=sh(3,1)*sh(3,2)*sh(1,3)
+    SHP(12)=sh(2,1)*sh(3,2)*sh(1,3)
+    SHP(13)=sh(2,1)*sh(1,2)*sh(1,3)
+    SHP(14)=sh(3,1)*sh(1,2)*sh(1,3)
+    SHP(15)=sh(2,1)*sh(1,2)*sh(2,3)
+    SHP(16)=sh(3,1)*sh(1,2)*sh(2,3)
+    SHP(17)=sh(2,1)*sh(1,2)*sh(3,3)
+    SHP(18)=sh(3,1)*sh(1,2)*sh(3,3)
+    SHP(19)=sh(1,1)*sh(2,2)*sh(2,3)
+    SHP(20)=sh(1,1)*sh(3,2)*sh(2,3)
+    SHP(21)=sh(1,1)*sh(2,2)*sh(3,3)
+    SHP(22)=sh(1,1)*sh(3,2)*sh(3,3)
+    SHP(23)=sh(1,1)*sh(2,2)*sh(1,3)
+    SHP(24)=sh(1,1)*sh(3,2)*sh(1,3)
+    SHP(25)=sh(1,1)*sh(1,2)*sh(1,3)
+    SHP(26)=sh(1,1)*sh(1,2)*sh(2,3)
+    SHP(27)=sh(1,1)*sh(1,2)*sh(3,3)
+
+    dn(1,:)=(5*r-3)*5*0.2*iDCell
+    dn(2,:)=(-50*r+25)*0.2*iDCell
+    dn(3,:)=(5*r-2)*5*0.2*iDCell
+    !cauclate the DNDX
+    DNDX(1)=dn(2,1)*sh(2,2)*sh(2,3)
+    DNDX(2)=dn(3,1)*sh(2,2)*sh(2,3)
+    DNDX(3)=dn(3,1)*sh(3,2)*sh(2,3)
+    DNDX(4)=dn(2,1)*sh(3,2)*sh(2,3)
+    DNDX(5)=dn(2,1)*sh(2,2)*sh(3,3)
+    DNDX(6)=dn(3,1)*sh(2,2)*sh(3,3)
+    DNDX(7)=dn(3,1)*sh(3,2)*sh(3,3)
+    DNDX(8)=dn(2,1)*sh(3,2)*sh(3,3)
+    DNDX(9)=dn(2,1)*sh(2,2)*sh(1,3)
+    DNDX(10)=dn(3,1)*sh(2,2)*sh(1,3)
+    DNDX(11)=dn(3,1)*sh(3,2)*sh(1,3)
+    DNDX(12)=dn(2,1)*sh(3,2)*sh(1,3)
+    DNDX(13)=dn(2,1)*sh(1,2)*sh(1,3)
+    DNDX(14)=dn(3,1)*sh(1,2)*sh(1,3)
+    DNDX(15)=dn(2,1)*sh(1,2)*sh(2,3)
+    DNDX(16)=dn(3,1)*sh(1,2)*sh(2,3)
+    DNDX(17)=dn(2,1)*sh(1,2)*sh(3,3)
+    DNDX(18)=dn(3,1)*sh(1,2)*sh(3,3)
+    DNDX(19)=dn(1,1)*sh(2,2)*sh(2,3)
+    DNDX(20)=dn(1,1)*sh(3,2)*sh(2,3)
+    DNDX(21)=dn(1,1)*sh(2,2)*sh(3,3)
+    DNDX(22)=dn(1,1)*sh(3,2)*sh(3,3)
+    DNDX(23)=dn(1,1)*sh(2,2)*sh(1,3)
+    DNDX(24)=dn(1,1)*sh(3,2)*sh(1,3)
+    DNDX(25)=dn(1,1)*sh(1,2)*sh(1,3)
+    DNDX(26)=dn(1,1)*sh(1,2)*sh(2,3)
+    DNDX(27)=dn(1,1)*sh(1,2)*sh(3,3)
+
+    !cauclate the DNDY
+    DNDY(1)=sh(2,1)*dn(2,2)*sh(2,3)
+    DNDY(2)=sh(3,1)*dn(2,2)*sh(2,3)
+    DNDY(3)=sh(3,1)*dn(3,2)*sh(2,3)
+    DNDY(4)=sh(2,1)*dn(3,2)*sh(2,3)
+    DNDY(5)=sh(2,1)*dn(2,2)*sh(3,3)
+    DNDY(6)=sh(3,1)*dn(2,2)*sh(3,3)
+    DNDY(7)=sh(3,1)*dn(3,2)*sh(3,3)
+    DNDY(8)=sh(2,1)*dn(3,2)*sh(3,3)
+    DNDY(9)=sh(2,1)*dn(2,2)*sh(1,3)
+    DNDY(10)=sh(3,1)*dn(2,2)*sh(1,3)
+    DNDY(11)=sh(3,1)*dn(3,2)*sh(1,3)
+    DNDY(12)=sh(2,1)*dn(3,2)*sh(1,3)
+    DNDY(13)=sh(2,1)*dn(1,2)*sh(1,3)
+    DNDY(14)=sh(3,1)*dn(1,2)*sh(1,3)
+    DNDY(15)=sh(2,1)*dn(1,2)*sh(2,3)
+    DNDY(16)=sh(3,1)*dn(1,2)*sh(2,3)
+    DNDY(17)=sh(2,1)*dn(1,2)*sh(3,3)
+    DNDY(18)=sh(3,1)*dn(1,2)*sh(3,3)
+    DNDY(19)=sh(1,1)*dn(2,2)*sh(2,3)
+    DNDY(20)=sh(1,1)*dn(3,2)*sh(2,3)
+    DNDY(21)=sh(1,1)*dn(2,2)*sh(3,3)
+    DNDY(22)=sh(1,1)*dn(3,2)*sh(3,3)
+    DNDY(23)=sh(1,1)*dn(2,2)*sh(1,3)
+    DNDY(24)=sh(1,1)*dn(3,2)*sh(1,3)
+    DNDY(25)=sh(1,1)*dn(1,2)*sh(1,3)
+    DNDY(26)=sh(1,1)*dn(1,2)*sh(2,3)
+    DNDY(27)=sh(1,1)*dn(1,2)*sh(3,3) 
+    
+    !caculate the DNDZ
+    DNDZ(1)=sh(2,1)*sh(2,2)*dn(2,3)
+    DNDZ(2)=sh(3,1)*sh(2,2)*dn(2,3)
+    DNDZ(3)=sh(3,1)*sh(3,2)*dn(2,3)
+    DNDZ(4)=sh(2,1)*sh(3,2)*dn(2,3)
+    DNDZ(5)=sh(2,1)*sh(2,2)*dn(3,3)
+    DNDZ(6)=sh(3,1)*sh(2,2)*dn(3,3)
+    DNDZ(7)=sh(3,1)*sh(3,2)*dn(3,3)
+    DNDZ(8)=sh(2,1)*sh(3,2)*dn(3,3)
+    DNDZ(9)=sh(2,1)*sh(2,2)*dn(1,3)
+    DNDZ(10)=sh(3,1)*sh(2,2)*dn(1,3)
+    DNDZ(11)=sh(3,1)*sh(3,2)*dn(1,3)
+    DNDZ(12)=sh(2,1)*sh(3,2)*dn(1,3)
+    DNDZ(13)=sh(2,1)*sh(1,2)*dn(1,3)
+    DNDZ(14)=sh(3,1)*sh(1,2)*dn(1,3)
+    DNDZ(15)=sh(2,1)*sh(1,2)*dn(2,3)
+    DNDZ(16)=sh(3,1)*sh(1,2)*dn(2,3)
+    DNDZ(17)=sh(2,1)*sh(1,2)*dn(3,3)
+    DNDZ(18)=sh(3,1)*sh(1,2)*dn(3,3)
+    DNDZ(19)=sh(1,1)*sh(2,2)*dn(2,3)
+    DNDZ(20)=sh(1,1)*sh(3,2)*dn(2,3)
+    DNDZ(21)=sh(1,1)*sh(2,2)*dn(3,3)
+    DNDZ(22)=sh(1,1)*sh(3,2)*dn(3,3)
+    DNDZ(23)=sh(1,1)*sh(2,2)*dn(1,3)
+    DNDZ(24)=sh(1,1)*sh(3,2)*dn(1,3)
+    DNDZ(25)=sh(1,1)*sh(1,2)*dn(1,3)
+    DNDZ(26)=sh(1,1)*sh(1,2)*dn(2,3)
+    DNDZ(27)=sh(1,1)*sh(1,2)*dn(3,3)
+      end subroutine NShape_Bspline
+      
+end module GridData

@@ -38,6 +38,7 @@ module ParticleData
      logical:: SkipThis  ! for plot less
      logical:: failure   ! failure
      integer:: icell     ! cell number
+     integer:: centericell !cell number in the Auxiliary grid
      real(8):: DMG       ! damage
      real(8):: LT        ! lighting time for explosive simulation
      real(8):: ie        ! internal energy
@@ -74,6 +75,8 @@ module ParticleData
   logical:: USL = .false.       ! use USL method
   logical:: USF = .false.       ! use USF method?
   logical:: GIMP = .false.      ! use cpGIMP method? 
+  logical:: Bspline=.false.     ! use Bspline method?
+  logical:: SGMP=.false.        ! use SGMP method?
   logical:: contact = .false.   ! use contact method?
   logical:: Gravity = .false.   ! set gravity?
   logical:: DR_DAMPING = .false. ! use dynamic relaxation techniques for quasi static solution?

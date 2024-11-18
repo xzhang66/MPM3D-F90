@@ -112,15 +112,15 @@ contains
     integer key, i, tempI
     logical:: updateMethod = .false.
 
-    integer,parameter:: nbkw = 36
+    integer,parameter:: nbkw = 38
     character(4),parameter:: kw(nbkw) = (/ &
          'endi','mpm3','nbmp','endt','grid','spx ', &
          'spy ','spz ','dcel','dtsc','outt','rptt', &
          'fixe','nmat','mate','part','musl','jaum', &
          'load','velo','outr','curv','seos','pt2d', &
          'curx','deto','tecp','bulk','gimp','cont', &
-         'usf ','usl ','nbco','nbbo','para','drda' &
-         /)
+         'usf ','usl ','nbco','nbbo','para','drda', &
+         'bimp','sgmp'/)
 
     do while(.true.)
        key = keyword(kw,nbkw)
@@ -318,7 +318,17 @@ contains
 
        case(36)   ! drda - Activate damping for static solution using dynamic relaxation
           DR_DAMPING = .true.
-
+          
+       case(37)   ! BSMPM
+          Bspline = .true.
+          write(*,"(a)") 'BSMPM is used'
+          write(iomsg,"(a)") 'BSMPM is used'
+          
+       case(38)   ! BSMPM
+          SGMP = .true.
+          write(*,"(a)") 'SGMP is used'
+          write(iomsg,"(a)") 'SGMP is used'
+          
        case default ! error
           stop 'STOP - Error encountered in reading data'
 
@@ -498,14 +508,15 @@ contains
     integer p, newi, PtOption, pnum
     integer matID
     integer ix, iy, iz
-    integer nx, ny, nz
+    integer nx, ny, nz,nr
     real(8) ox, oy, oz ! coordinates of origin point
+    real(8) oox,ooy,ooz
     real(8) tx, ty, tz
     real(8) dp, radius2, pmass
 
-    integer,parameter:: nbkw = 3
+    integer,parameter:: nbkw = 5
     character(4),parameter:: kw(nbkw) = (/  &
-         'poin','bloc','sphe'   /)
+         'poin','bloc','sphe','blod','cicle'  /)
 
     if(nb_particle.eq.0) then
        stop '*** Error *** nbmp must be defined in advance!'
@@ -581,6 +592,7 @@ contains
        ox = GetReal()    ! origin of the block
        oy = GetReal() 
        oz = GetReal()
+       !repair
        ox = ox + dp*0.5  ! offset the origin to the first particle
        oy = oy + dp*0.5
        oz = oz + dp*0.5
@@ -588,9 +600,9 @@ contains
        ny = GetInt()
        nz = GetInt()
 
-       do ix = 1, nx
+       do iz = 1, nz
           do iy = 1, ny
-             do iz = 1, nz
+             do ix = 1, nx
                 ! count the particle number			    
                 parCounter = parCounter + 1 
                 if(parCounter.gt.nb_particle) then
@@ -673,6 +685,129 @@ contains
              end do
           end do
        end do
+
+       body_list(bodyCounter)%par_end = parCounter
+
+    case(4)    ! blod (comID, matID, density, dp, ox, oy, oz, nx, ny, nz,oox,ooy,ooz,nr)
+       bodyCounter = bodyCounter + 1
+       body_list(bodyCounter)%comID = GetInt()
+
+       matID = GetInt()
+       body_list(bodyCounter)%mat = matID
+       body_list(bodyCounter)%par_begin = parCounter +1
+
+       if(matID.gt.nb_mat .or. matID.le.0) then
+          call ErrorMsg()
+          stop '*** Error *** improper material ID'
+       end if
+
+       pmass = GetReal()
+       dp = GetReal()    ! distance between particles
+	   pmass = pmass*dp**3
+       ox = GetReal()    ! origin of the block
+       oy = GetReal() 
+       oz = GetReal()
+       !repair
+       ox = ox + dp*0.5  ! offset the origin to the first particle
+       oy = oy + dp*0.5
+       oz = oz + dp*0.5
+       nx = GetInt()     ! number of particle in each direction
+       ny = GetInt()
+       nz = GetInt()
+       oox=Getreal()
+       ooy=Getreal()
+       ooz=Getreal()
+       nr=Getint()
+       radius2 = (nr * dp ) ** 2
+
+       do iz = 1, nz
+          do iy = 1, ny
+             do ix = 1, nx
+                 tx=(ix - 1)*dp + ox
+                 ty=(iy - 1)*dp + oy
+                 tz=(iz - 1)*dp + oz
+                 if (((tx - oox)**2 + (ty - ooy)**2).GE. radius2) then
+                   ! count the particle number
+                ! count the particle number			    
+                parCounter = parCounter + 1 
+                if(parCounter.gt.nb_particle) then
+                   call ErrorMsg()
+                   call ErrorPt()
+                end if
+
+                particle_list(parCounter)%mass = pmass
+
+                if(matID.gt.nb_mat) then
+                   call ErrorMsg()
+                   stop '*** Error *** material ID greater than nb_mat'
+                end if
+
+                particle_list(parCounter)%Xp(1) = tx
+                particle_list(parCounter)%Xp(2) = ty
+                particle_list(parCounter)%Xp(3) = tz
+
+                if(plot2dTrue) then
+                   call setskip(parCounter)
+                end if
+                end if
+
+             end do
+          end do
+       end do
+
+       body_list(bodyCounter)%par_end = parCounter
+       
+    case(5)  ! plate (comID, matID, density, dp, ox, oy, oz, nRadius)
+       bodyCounter = bodyCounter + 1
+       body_list(bodyCounter)%comID = GetInt()
+
+       matID = GetInt()
+       body_list(bodyCounter)%mat = matID
+       body_list(bodyCounter)%par_begin = parCounter +1
+       if(matID.gt.nb_mat .or. matID.le.0) then
+          call ErrorMsg()
+          stop '*** Error *** improper material ID'
+       end if
+
+       pmass = GetReal()
+       dp = GetReal()    ! distance between particles
+	   pmass = pmass*dp**3
+       ox = GetReal()    ! origin of the sphere
+       oy = GetReal() 
+       oz = GetReal()
+       nx = GetInt()
+       radius2 = (nx * dp ) ** 2
+       do ix = 1-nx, nx
+          do iy = 1-nx, nx
+                tx = (ix - 1)*dp + ox + 0.5*dp
+                ty = (iy - 1)*dp + oy + 0.5*dp
+                tz =  oz + dp*0.5
+                if (((tx - ox)**2 + (ty - oy)**2 ) .lt. radius2) then
+                   ! count the particle number
+                   parCounter = parCounter + 1    
+                   if(parCounter.gt.nb_particle) then
+                      call ErrorMsg()
+                      call ErrorPt()
+                   end if
+
+                   particle_list(parCounter)%mass = pmass
+
+                   if(matID.gt.nb_mat) then
+                      call ErrorMsg()
+                      stop '*** Error *** material ID greater than nb_mat'
+                   end if
+
+                   particle_list(parCounter)%Xp(1) = tx
+                   particle_list(parCounter)%Xp(2) = ty
+                   particle_list(parCounter)%Xp(3) = tz
+
+                   if(plot2dTrue) then
+                      call setskip(parCounter)
+                   end if
+
+                end if
+             end do
+          end do
 
        body_list(bodyCounter)%par_end = parCounter
 
@@ -781,10 +916,10 @@ contains
     use FFI
     implicit none
 
-    integer k, inode, ibody, cpl, i
-    real(8):: vxp, vyp, vzp
-    integer,parameter:: nbkw = 3
-    character(4),parameter:: kw(nbkw) = (/'endv','node','body'/)
+    integer k, inode, ibody, cpl, i,j,m,n
+    real(8):: vxp, vyp, vzp,v0,dc,y,A,W,q,c1,c2,x
+    integer,parameter:: nbkw = 5
+    character(4),parameter:: kw(nbkw) = (/'endv','node','body','ksin','kbonuli'/)
 
     if(nb_body.eq.0) then
        stop '*** Error *** nbby must be defined !'
@@ -813,7 +948,42 @@ contains
              particle_list(i)%VXp(2) = vyp
              particle_list(i)%VXp(3) = vzp
           end do
-
+       case(4)!bysin
+          v0=GetReal()
+          ibody=GetInt()
+          n=320
+          dc=0.003125
+          if(ibody==1)then
+        do j=1,4
+          do i=n*(j-1)+1,n*j
+            m=mod(i,n)
+            if(m==0)m=n
+            particle_list(i)%VXp(1) = v0*sin(3.1415926535*((m-1)*dc+dc/2.0))
+            particle_list(i)%VXp(2) = 0
+            particle_list(i)%VXp(3) = 0
+          end do
+        end do
+          end if
+          case(5)!EUler beam
+          y=GetReal()
+          n=384
+          dc=0.00015625
+          q=78.83
+          c1=cosh(q*0.06)-cos(q*0.06)
+          c2=sinh(q*0.06)-sin(q*0.06)
+          A=y/(2*c2)
+          W=q*q*sqrt(318e9*0.01*0.01/(12*1845*(1-0.054*0.054)))
+        do j=1,128
+          do i=n*(j-1)+1,n*j
+            m=mod(i,n)
+            if(m==0)m=n
+            x=((m-1)*dc+dc/2.0)
+            particle_list(i)%VXp(1) = 0
+            particle_list(i)%VXp(2) = A*W*(c1*(sinh(q*x)+sin(q*x))-c2*(cosh(q*x)+cos(q*x)))
+            particle_list(i)%VXp(3) = 0
+          end do
+        end do
+              
        case default    ! error
           call ErrorMsg()
           stop 'error GetVelocity'
@@ -858,11 +1028,11 @@ contains
     use FFI
     implicit none
     integer:: k
-    integer,parameter:: nbkw = 14
+    integer,parameter:: nbkw = 16
     character(4),parameter:: kw(nbkw) = (/ &
          'seqv','epef','mat ','pres','volu',&
          'engk','engi','velx','vely','velz',&
-         'cels','fail','sspd','damg' &
+         'cels','fail','sspd','damg','stressx','disx' &
          /)
 
     SetResOption = keyword(kw,nbkw)
@@ -1058,7 +1228,7 @@ contains
        end if
     end do
 
-    DT = DT * DTScale
+    DT = DT*DTscale
 
   end subroutine SetDT
 
