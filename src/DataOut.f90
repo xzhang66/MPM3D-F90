@@ -28,11 +28,11 @@ module DataOut
   integer:: nCvs = 0
   integer:: nAnm = 0
 
-  integer, parameter:: nVariables = 14
+  integer, parameter:: nVariables = 16
   character(4), parameter:: OutputName(nVariables) = (/ &
        'seqv','epef','mat ','pres','volu',  &
        'engk','engi','velx','vely','velz',  &
-       'cels','fail','sspd','damg'          &
+       'cels','fail','sspd','damg','stressx','disx'&
        /)
 
   logical:: WriteTecPlot  = .false.
@@ -121,10 +121,13 @@ contains
        case(12) !fail
           write(iow2,"(i12)", advance='no') pt%failure
        case(13) !szz
-          write(iow2,"(e12.4)", advance='no') pt%SDzz+pt%SM
+          write(iow2,"(e12.4)", advance='no') pt%SDzz
        case(14) !damg
           write(iow2,"(e12.4)", advance='no') pt%DMG
-
+        case(15) !stressx
+          write(iow2,"(e12.4)", advance='no') pt%SDxx+pt%SM
+        case(16) !disx
+          write(iow2,"(e12.4)", advance='no') pt%Xp(1)-pt%Xo(1)
        end select
 
     end do
@@ -203,7 +206,7 @@ contains
              case(7) !engi
                 write(iow1,"(e12.4)", advance='no') pt%ie
              case(8) !vx
-                write(iow1,"(e12.4)", advance='no') pt%VXp(1)
+                write(iow1,"(e12.4)", advance='no') pt%Vxp(1)
              case(9) !vy
                 write(iow1,"(e12.4)", advance='no') pt%VXp(2)
              case(10) !vz
@@ -221,6 +224,10 @@ contains
                 write(iow1,"(e12.4)", advance='no') pt%cp
              case(14) !damage
                 write(iow1,"(e12.4)", advance='no') pt%DMG
+             case(15) !stressx
+                write(iow1,"(e12.4)", advance='no') pt%SDxx+pt%SM
+             case(16) !stressx
+                write(iow1,"(e12.4)", advance='no') pt%Xp(1)-pt%Xo(1)
              end select
           end do ! i
           write(iow1,*)
@@ -420,6 +427,20 @@ contains
         write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%DMG
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'damage'
+    
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'stressx'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%SDXX+pt%SM
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'stressx'
+    
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'disx'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%Xp(1)-pt%Xo(1)
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'disx'
 
     ! 'POINTDATA' XML TAG :: CLOSE
     write(iow11,32) indent//indent, 'PointData'

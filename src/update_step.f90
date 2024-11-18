@@ -30,14 +30,16 @@ subroutine GridMomentumInitial()
   use MaterialData
   implicit none
 
-  integer:: b, p, n, c, parBegin, parEnd ! loop counter
-  integer:: icell, inode, ix, iy, iz, mat_, comID = 1
+  integer:: b, p, n, c,i,j, parBegin, parEnd ! loop counter
+  integer:: icell,centericell, inode, ix, iy, iz, mat_, comID = 1
   real(8):: sxx, syy, szz, sxy, syz, sxz
   real(8):: fx(3), f_int(3), f_ext(3), mp_, vol_
   real(8):: shm, SHPn, DNDXn, DNDYn, DNDZn
 
   type(Particle), POINTER :: pt
   type(GridNodeProperty), POINTER :: gd
+  type(CellData), POINTER :: ct
+  type(CellDataproperty),POINTER ::cd
 
   ! Calculate the grid nodal masses, moemntum only 
   ! Reset Grid data
@@ -46,6 +48,13 @@ subroutine GridMomentumInitial()
   grid_list%PXg(1) = 0.0d0;    ! Nodal momentum
   grid_list%PXg(2) = 0.0d0;    
   grid_list%PXg(3) = 0.0d0;
+  
+  if(SGMP)then
+      cellp_list%Cmg=0.0d0         ! the mass of the Auxiliary grid
+      cellp_list%Cpxg(1)=0.0d0;     !the momentum of the Auxiliary grid
+      cellp_list%Cpxg(2)=0.0d0;
+      cellp_list%Cpxg(3)=0.0d0;
+  end if
 
   do b = 1, nb_body     ! Loop over all bodies
      parBegin = body_list(b)%par_begin
@@ -55,12 +64,32 @@ subroutine GridMomentumInitial()
 
      do p = parBegin, parEnd    ! Loop over all particles (1)
         pt => particle_list(p)
+        if(SGMP)then
+        pt%centericell=CenterInWhichCell(pt%Xp)
+        centericell=pt%centericell
+        if(centericell<0)cycle
+        vol_ = pt%VOL
+        mp_ = pt%Mass
+        CenterInflNode(1:8)=CenterCellNode(centericell,:)
+        call SGNShape(CenterInflNode(1),p,0)
+        do n = 1, centernb_InflNode 
+           ! out of the computational grid
+           if (CenterInflNode(n) .gt. nb_centernode .or. &
+               CenterInflNode(n) .le. 0) cycle  
 
+            cd => cellp_list(CenterInflNode(n))
+
+           SHPn = SHP(n)
+           shm = SHPn*mp_
+
+           cd%Cmg = cd%Cmg + shm            ! the nodal mass of Auxiliary grid
+           cd%CpXg = cd%Cpxg + pt%VXp*shm   ! the nodal momentum of Auxiliary grid
+        end do !n
+        else
         pt%icell = InWhichCell(pt%Xp)
         icell = pt%icell
         ! Particle p is out of the computational region
         if (icell < 0) cycle    
-
         vol_ = pt%VOL
         mp_ = pt%Mass
 
@@ -69,6 +98,9 @@ subroutine GridMomentumInitial()
         if (GIMP) then
            call FindInflNode(p,icell)
            call NShape_GIMP(p)
+        else if(Bspline) then
+           call BFindInflNode(icell)
+           call NShape_Bspline(p)
         else
            call NShape(InflNode(1),p,0)
         end if
@@ -88,9 +120,21 @@ subroutine GridMomentumInitial()
            gd%Mg = gd%Mg + shm            ! the nodal mass
            gd%PXg = gd%PXg + pt%VXp*shm   ! the nodal momentum
         end do !n
-
+        end if
      end do !p
   end do    !b
+  
+     if(SGMP)then
+            do i=1,nb_centernode
+             InflNode(1:8)=CellsNode(i,:)
+             call CNShape(0)
+                do j=1,nb_InflNode
+                    gd => grid_list(comID, InflNode(j))
+                      gd%Mg = gd%Mg + CSHP(j)*  cellp_list(i)%Cmg          ! the nodal mass
+                      gd%PXg = gd%PXg + CSHP(j)*cellp_list(i)%Cpxg   ! the nodal momentum
+                end do
+            end do
+     end if
 end subroutine GridMomentumInitial
 
 subroutine ParticleStressUpdate()
@@ -105,14 +149,53 @@ subroutine ParticleStressUpdate()
   use MaterialData
   implicit none
 
-  integer:: b, p, n, parBegin, parEnd ! loop counter
-  integer:: icell, inode, ix, iy, iz, comID = 1
+  integer:: b, p, n,i,j, parBegin, parEnd ! loop counter
+  integer:: icell, inode,centericell, ix, iy, iz, comID = 1
   real(8):: xx(3), vx(3), ax(3), vgx(3)
   real(8):: de(6), vort(3)
   real(8):: mp_, shm, SHPn, DNDXn, DNDYn, DNDZn
 
   type(Particle), POINTER :: pt
   type(GridNodeProperty), POINTER :: gd
+  type(CellData), POINTER :: ct
+  type(CellDataproperty), POINTER :: cd
+  
+  if(SGMP)then
+      cellp_list%Co(1)=0.0d0;
+      cellp_list%Co(2)=0.0d0;
+      cellp_list%Co(3)=0.0d0;
+      cellp_list%Co(4)=0.0d0;
+      cellp_list%Co(5)=0.0d0;
+      cellp_list%Co(6)=0.0d0;
+  
+      cellp_list%Cw(1)=0.0d0;
+      cellp_list%Cw(2)=0.0d0;
+      cellp_list%Cw(3)=0.0d0;
+  end if
+  
+  if(SGMP)then
+      do i=1,nb_centernode
+      cd=>cellp_list(i)
+      call CNShape(2)
+      InflNode(1:8)=CellsNode(i,:)
+      do j=1,nb_InflNode
+          gd => grid_list(comID, InflNode(j))
+          if(gd%Mg>cutoff) then
+          vgx=gd%PXg/gd%Mg
+          cd%Co(1)=cd%Co(1)+CDNDX(j)*vgx(1)
+          cd%Co(2)=cd%Co(2)+CDNDY(j)*vgx(2)
+          cd%Co(3)=cd%Co(3)+CDNDZ(j)*vgx(3)
+          cd%Co(4)=cd%Co(4)+CDNDZ(j)*vgx(2)+CDNDY(j)*vgx(3)
+          cd%Co(5)=cd%Co(5)+CDNDZ(j)*vgx(1)+CDNDX(j)*vgx(3)
+          cd%Co(6)=cd%Co(6)+CDNDY(j)*vgx(1)+CDNDX(j)*vgx(2)
+          cd%Cw(1)=cd%Cw(1)+CDNDY(j)*vgx(3)-CDNDZ(j)*vgx(2)
+          cd%Cw(2)=cd%Cw(2)+CDNDZ(j)*vgx(1)-CDNDX(j)*vgx(3)
+          cd%Cw(3)=cd%Cw(3)+CDNDX(j)*vgx(2)-CDNDY(j)*vgx(1)
+          end if
+      end do
+      end do
+  end if
+  
 
   ! Calculate the increment strain and vorticity
   ! de(i) comply the Voigt rule (d11, d22, d33, 2*d23, 2*d13, 2*d12)
@@ -127,6 +210,22 @@ subroutine ParticleStressUpdate()
 
         de   = 0d0    ! Incremental strain
         vort = 0d0    ! Incremental vorticity
+        
+        if(SGMP)then
+        centericell = pt%centericell    ! use old position
+        ! Particle p is out of the computational region
+        if (centericell < 0) cycle  
+        ! Calculate the shape functions and their derivatives 
+        CenterInflNode(1:8)=CenterCellNode(centericell,:)
+        call SGNShape(CenterInflNode(1),p,0)
+        do n = 1, centernb_InflNode
+           if (CenterInflNode(n) .gt. nb_centernode .or. CenterInflNode(n) .le. 0) &
+              cycle  ! out of the computational grid
+           cd => cellp_list(CenterInflNode(n))
+           de=de+cd%Co*SHP(n)
+           vort=vort+cd%Cw*SHP(n)
+        end do ! n
+        else
 
         icell = pt%icell    ! use old position
         ! Particle p is out of the computational region
@@ -137,6 +236,9 @@ subroutine ParticleStressUpdate()
         if (GIMP) then
            call FindInflNode(p,icell)
            call NShape_GIMP(p)
+        else if(Bspline) then
+           call BFindInflNode(icell)
+           call NShape_Bspline(p)
         else
            call NShape(InflNode(1),p,1)
         end if
@@ -170,6 +272,8 @@ subroutine ParticleStressUpdate()
               vort(3) = vort(3) + (DNDXn*vgx(2) - DNDYn*vgx(1))    
            end if
         end do ! n
+        end if
+        
 
         de = de * DT    
         vort = vort * DT / 2d0
@@ -194,8 +298,8 @@ subroutine GridMomentumUpdate()
   use MaterialData
   implicit none
 
-  integer:: b, p, n, c, parBegin, parEnd ! loop counter
-  integer:: icell, inode, ix, iy, iz, mat_, comID = 1
+  integer:: b, p, n, c,i,j, parBegin, parEnd ! loop counter
+  integer:: icell,centericell, inode, ix, iy, iz, mat_, comID = 1
   real(8):: sxx, syy, szz, sxy, syz, sxz
   real(8):: fx(3), f_int(3), f_ext(3), mp_, vol_
   real(8):: shm, SHPn, DNDXn, DNDYn, DNDZn
@@ -203,6 +307,23 @@ subroutine GridMomentumUpdate()
   type(Particle), POINTER :: pt
   type(GridNodeProperty), POINTER :: gd
   type(ContactGridNodeProperty), POINTER :: CP
+  type(CellData), POINTER :: ct
+  type(CellDataproperty), POINTER :: cd
+  
+  if(SGMP)then
+    cellp_list%Cfxg(1)=0.0d0;
+    cellp_list%Cfxg(2)=0.0d0;
+    cellp_list%Cfxg(3)=0.0d0;
+    cellp_list%Cfint(1)=0.0d0;
+    cellp_list%Cfint(2)=0.0d0;
+    cellp_list%Cfint(3)=0.0d0;
+    cellp_list%Cfint(4)=0.0d0;
+    cellp_list%Cfint(5)=0.0d0;
+    cellp_list%Cfint(6)=0.0d0;
+    cellp_list%Cfext(1)=0.0d0;
+    cellp_list%Cfext(2)=0.0d0;
+    cellp_list%Cfext(3)=0.0d0;
+    end if
 
   ! Calculate the grid nodal forces only
 
@@ -224,7 +345,40 @@ subroutine GridMomentumUpdate()
      if(contact) comID = body_list(b)%comID  ! Get comID from body
      do p = parBegin, parEnd    ! Loop over all particles
         pt => particle_list(p)
-
+        if(SGMP)then
+             centericell=pt%centericell
+             if (centericell < 0) cycle
+             sxx = pt%SM - pt%q + pt%SDxx   ! Stresses
+             syy = pt%SM - pt%q + pt%SDyy
+             szz = pt%SM - pt%q + pt%SDzz
+             sxy = pt%SDxy
+             syz = pt%SDyz
+             sxz = pt%SDxz
+             fx = pt%FXp
+             if (Gravity) then
+			fx = fx + pt%Mass * (body_list(b)%Gravp)    
+             end if
+             vol_ = pt%VOL
+             mp_ = pt%Mass
+             CenterInflNode(1:8)=CenterCellNode(centericell,:)
+             call SGNShape(CenterInflNode(1),p,0)
+             do n = 1, centernb_InflNode 
+                if (CenterInflNode(n) .gt. nb_centernode .or. CenterInflNode(n) .le. 0) &
+               cycle  ! out of the computational grid
+                cd => cellp_list(CenterInflNode(n))
+                SHPn = SHP(n)
+                DNDXn=DNDX(n)
+                DNDYn=DNDY(n)
+                DNDZn=DNDZ(n)
+                cd%Cfext = cd%Cfext+fx*SHPn
+                cd%Cfint(1) =cd%Cfint(1)+SHPn*sxx*vol_
+                cd%Cfint(2) =cd%Cfint(2)+SHPn*syy*vol_
+                cd%Cfint(3) =cd%Cfint(3)+SHPn*szz*vol_
+                cd%Cfint(4) =cd%Cfint(4)+SHPn*sxy*vol_
+                cd%Cfint(5) =cd%Cfint(5)+SHPn*syz*vol_
+                cd%Cfint(6) =cd%Cfint(6)+SHPn*sxz*vol_
+             end do !n
+        else
         icell = pt%icell        ! using old position
 
         ! Particle p is out of the computational region
@@ -250,6 +404,9 @@ subroutine GridMomentumUpdate()
         if (GIMP) then
            call FindInflNode(p,icell)
            call NShape_GIMP(p)
+        else if(Bspline) then
+           call BFindInflNode(icell)
+           call NShape_Bspline(p)
         else
            call NShape(InflNode(1),p,2)
         end if
@@ -283,9 +440,34 @@ subroutine GridMomentumUpdate()
            end if
 
         end do !n
+        end if
 
      end do !p
   end do    !b
+  
+  if(SGMP)then
+      do i=1,nb_centernode
+             cd=>cellp_list(i)
+             InflNode(1:8)=CellsNode(i,:)
+             call CNShape(2)
+                do j=1,nb_InflNode
+                    gd => grid_list(comID, InflNode(j))
+                    f_int(1) =  -(cd%Cfint(1)*CDNDX(j) + cd%Cfint(4)*CDNDY(j) + cd%Cfint(6)*CDNDZ(j))
+                    f_int(2) =  -(cd%Cfint(4)*CDNDX(j) + cd%Cfint(2)*CDNDY(j) + cd%Cfint(5)*CDNDZ(j))
+                    f_int(3) =  -(cd%Cfint(6)*CDNDX(j) + cd%Cfint(5)*CDNDY(j) + cd%Cfint(3)*CDNDZ(j))
+                    
+                      gd%FXg = gd%FXg + CSHP(j)*cd%Cfext+f_int         ! the nodal force
+                      
+                      if(contact) then
+                        CP => CP_list(comID, InflNode(j)) 
+                        CP%ndir(1) = CP%ndir(1) + CDNDX(j)*cd%Cmg
+                        CP%ndir(2) = CP%ndir(2) + CDNDY(j)*cd%Cmg
+                        CP%ndir(3) = CP%ndir(3) + CDNDZ(j)*cd%Cmg
+                      end if
+                end do
+      end do
+  end if
+  
 end subroutine GridMomentumUpdate
 
 subroutine IntegrateMomentum()
@@ -483,14 +665,40 @@ subroutine ParticlePositionUpdate()
   use MaterialData
   implicit none
 
-  integer:: b, p, n, parBegin, parEnd ! loop counter
-  integer:: icell, inode, ix, iy, iz, comID = 1
+  integer:: b, p, n,i,j, parBegin, parEnd ! loop counter
+  integer:: icell,centericell, inode, ix, iy, iz, comID = 1
   real(8):: xx(3), vx(3), ax(3), vgx(3)
   real(8):: de(6), vort(3)
   real(8):: mp_, shm, SHPn, DNDXn, DNDYn, DNDZn
 
   type(Particle), POINTER :: pt
   type(GridNodeProperty), POINTER :: gd
+  type(CellData), POINTER :: ct
+  type(CellDataproperty), POINTER :: cd
+  
+  if(SGMP)then
+    cellp_list%Cvx(1)=0.0d0;
+    cellp_list%Cvx(2)=0.0d0;
+    cellp_list%Cvx(3)=0.0d0;
+    cellp_list%Cax(1)=0.0d0;
+    cellp_list%Cax(2)=0.0d0;
+    cellp_list%Cax(3)=0.0d0;
+  end if
+  
+  if(SGMP)then
+        do i=1,nb_centernode
+      cd=>cellp_list(i)
+      call CNShape(0)
+      InflNode(1:8)=CellsNode(i,:)
+      do j=1,nb_InflNode
+          gd => grid_list(comID, InflNode(j))
+          if (gd%Mg > CutOff) then 
+          cd%Cvx=cd%Cvx+CSHP(j)*gd%PXg/gd%Mg
+          cd%Cax=cd%Cax+CSHP(j)*gd%FXg/gd%Mg
+          end if
+      end do
+        end do
+        end if
 
   ! Update particle position and velocity
   do b = 1, nb_body
@@ -501,7 +709,25 @@ subroutine ParticlePositionUpdate()
 
      do p = parBegin, parEnd    ! Loop over all particles (2)
         pt => particle_list(p)
+        if(SGMP)then
+            centericell = pt%centericell
+            if (centericell < 0) cycle
+            xx = pt%Xp;  ! Particle position at time step k
+            vx = 0d0
+            ax = 0d0
+            CenterInflNode(1:8)=CenterCellNode(centericell,:)
+            call SGNShape(CenterInflNode(1),p,2)
+            do n = 1, centernb_InflNode
+           if(CenterInflNode(n) .gt. nb_centernode .or. CenterInflNode(n) .le. 0) &
+              cycle    ! out of the computational grid
 
+           cd => cellp_list(CenterInflNode(n))
+           SHPn = SHP(n)
+              vx = vx + SHPn * cd%Cvx
+              ax = ax + SHPn * cd%Cax
+
+        end do ! n
+        else
         icell = pt%icell
         ! Particle p is out of the computational region
         if (icell < 0) cycle
@@ -518,6 +744,9 @@ subroutine ParticlePositionUpdate()
         if (GIMP) then
            call FindInflNode(p,icell)
            call NShape_GIMP(p)
+        else if(Bspline) then
+           call BFindInflNode(icell)
+           call NShape_Bspline(p)
         else
            call NShape(InflNode(1),p,2)
         end if
@@ -536,7 +765,7 @@ subroutine ParticlePositionUpdate()
            end if
 
         end do ! n
-
+        end if
         ! Time integration
         pt%XX = xx + vx * DT       ! Update particle position
         if(istep == 1) then
@@ -564,18 +793,28 @@ subroutine GridMomentumMUSL()
   use MaterialData
   implicit none
 
-  integer:: b, c, p, n, parBegin, parEnd ! loop counter
-  integer:: icell, comID = 1
+  integer:: b, c, p, n,i,j, parBegin, parEnd ! loop counter
+  integer:: icell,centericell,comID = 1
   real(8):: de(6), vort(3)
   real(8):: mp_, shm, SHPn
 
   type(Particle), POINTER :: pt
   type(GridNodeProperty), POINTER :: gd
   type(GridNode), POINTER :: node
+  type(CellData),POINTER ::ct
+  type(CellDataproperty),POINTER::cd
+  
 
   grid_list%PXg(1) = 0.0d0;
   grid_list%PXg(2) = 0.0d0;
   grid_list%PXg(3) = 0.0d0;
+  
+  if(SGMP)then
+      cellp_list%Cpxg(1) = 0.0d0;
+      cellp_list%Cpxg(2) = 0.0d0;
+      cellp_list%Cpxg(3) = 0.0d0;
+  end if
+  
 
   ! Recalculate the grid node momentum
   do b = 1, nb_body        ! Loop over all bodies
@@ -586,7 +825,20 @@ subroutine GridMomentumMUSL()
 
      do p = parBegin, parEnd ! Loop over all particles (3)
         pt => particle_list(p)
-
+        if(SGMP)then
+            centericell = pt%centericell
+            if (centericell < 0) cycle 
+            mp_ = pt%mass
+            CenterInflNode(1:8)=CenterCellNode(centericell,:)
+            call SGNShape(CenterInflNode(1),p,0)
+            do n = 1, centernb_InflNode
+           if(CenterInflNode(n) .gt. nb_centernode .or. CenterInflNode(n) .le. 0) &
+              cycle  ! out of the computational grid
+           cd => cellp_list(CenterInflNode(n))
+           shm = SHP(n)*mp_
+           cd%Cpxg = cd%Cpxg + pt%VXp*shm
+            end do!n
+        else
         icell = pt%icell
         ! Particle p is out of the computational region
         if (icell < 0) cycle  
@@ -598,6 +850,9 @@ subroutine GridMomentumMUSL()
         if (GIMP) then
            call FindInflNode(p,icell)
            call NShape_GIMP(p)
+        else if(Bspline) then
+           call BFindInflNode(icell)
+           call NShape_Bspline(p)
         else
            call NShape(InflNode(1),p,0)
         end if
@@ -613,8 +868,21 @@ subroutine GridMomentumMUSL()
            gd%PXg = gd%PXg + pt%VXp*shm
 
         end do ! n
+        end if
      end do    ! p
   end do       ! b
+  
+  if(SGMP)then
+      do i=1,nb_centernode
+             InflNode(1:8)=CellsNode(i,:)
+             call CNShape(0)
+                do j=1,nb_InflNode
+                    gd => grid_list(comID, InflNode(j))
+                      gd%PXg = gd%PXg + CSHP(j)*cellp_list(i)%Cpxg   ! the nodal momentum
+                end do
+      end do
+  end if
+  
 
   ! Applying essential boundary conditions
   do c = 1, nb_component
