@@ -49,5 +49,5 @@ In **Windows**, you can install cygwin (https://www.cygwin.com/) and after addin
 cd .\make\gnu\
 make clean
 make
-./mpm3d Data/Deto1k.mpm
+.\mpm3d Data/Deto1k.mpm
 ```
