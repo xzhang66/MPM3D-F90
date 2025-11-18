@@ -34,6 +34,9 @@ The code is organized as:
 
 > **Slopefail.mpm**:  Failure of slope
 
+**VolumetricLockingEx**:  Example input data used to verify SGMPM's ability to free volumetric locking
+
+
 ## Compile and baisc usage
 
 Under **Linux**, you can compile and run an example by the following code:

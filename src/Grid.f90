@@ -31,12 +31,16 @@ module GridData
   type GridNode
      real(8):: Xg(3)     ! grid node coordinate
      logical:: Fix_x, Fix_y, Fix_z    ! BC
+     integer:: bd_type(3)=0       ! the type of the boundary 1-left boundary 2-right boundary 0-not boundary
   end type GridNode
 
   type GridNodeProperty
      real(8):: Mg        ! mass on grid node
      real(8):: PXg(3)    ! momentum on grid node
-     real(8):: FXg(3)    ! internal/external force on gride node
+     real(8):: FXg(3)    ! internal/external force on grid node
+     real(8):: Gpre=0.0  ! pressure on grid node
+     real(8):: GV_all=0.0!Volume on grid node mapped by particles
+     logical:: mapped = .false. !Is there a mapping of material points to this node during post-processing?
   end type GridNodeProperty
   
  type CellData
@@ -53,6 +57,11 @@ module GridData
      real(8)::Cax(3)    ! the accleration of the center node in the t+1/2
      real(8)::Co(6)     ! the strain increment and vorticity increment at the center node
      real(8)::Cw(3)
+     real(8)::CdeFp(3,3)    
+     real(8)::CPKint(9) !1st PK stress for TLMPM
+     real(8)::CGpre     ! pressure on auxiliary node
+     real(8):: CGV_all=0.0 !Volume on auxiliary node mapped by particles
+     logical:: Cmapped = .false. !Is there a mapping of material points to this node during post-processing?
   end type CellDataproperty
 
   type ContactGridNodeProperty
@@ -163,11 +172,11 @@ contains
 
     integer ix, iy, iz
 
-    if (xxx(1)<SpanX(1)+DCell/2.0 .or. xxx(1)>SpanX(2)-DCell/2.0 .or. xxx(2)<SpanY(1)+DCell/2.0 .or. &
-        xxx(2)>SpanY(2)-DCell/2.0 .or.xxx(3)<SpanZ(1)+DCell/2.0 .or. xxx(3)>SpanZ(2)-DCell/2.0) then
-       CenterInWhichCell = -1
-       return
-    end if
+    !if (xxx(1)<SpanX(1)+DCell/2.0 .or. xxx(1)>SpanX(2)-DCell/2.0 .or. xxx(2)<SpanY(1)+DCell/2.0 .or. &
+    !    xxx(2)>SpanY(2)-DCell/2.0 .or.xxx(3)<SpanZ(1)+DCell/2.0 .or. xxx(3)>SpanZ(2)-DCell/2.0) then
+    !   CenterInWhichCell = -1
+    !   return
+    !end if
 
     ix = int((xxx(1)-SpanX(1)-DCell/2.0)/DCell) + 1
     iy = int((xxx(2)-SpanY(1)-DCell/2.0)/DCell) + 1
@@ -180,6 +189,35 @@ contains
 
   end function CenterInWhichCell
 
+   
+function AuxiliaryGridSHP(XN,XXN,p_type)result(XINB)
+! -----------------------------------------------------------------
+! - Purpose                                                       -
+! -    Calculate grid SHP in the boundary auxiliary grid          -
+! -                                                               -
+! - Input                                                         -
+! -    XN(3) - particle natural coordinates in  background grid   -
+! -    XXN(3) - nature Coordinates of a point in auxiliary grid   -
+! -    p_type(3)   the type of the boundary of particle           -                                          -
+! - Return values                                                 -
+! -    XINB(3) : grid SHP in the boundary auxiliary grid          -  
+! -----------------------------------------------------------------
+    implicit none
+    real(8), intent(in):: XXN(3),XN(3)
+    real(8):: XINB(3)
+    integer:: i,p_type(3)
+    do i = 1,3
+        if(p_type(i))then
+            if(XN(i)<0) then
+                XINB(i)=1+2*XN(i)
+            else
+                XINB(i)=2*XN(i)-1
+            end if
+        else
+            XINB(i)=XXN(i)
+        end if
+    end do
+  end function  AuxiliaryGridSHP 
 
   subroutine SetGridData()
 ! -----------------------------------------------------------------
@@ -216,6 +254,9 @@ contains
     CenterNumCellx=NumCellx-1
     CenterNumCelly=NumCelly-1
     CenterNumCellz=NumCellz-1
+    if (CenterNumCellx == 0) CenterNumCellx=1
+    if (CenterNumCelly == 0) CenterNumCelly=1
+    if (CenterNumCellz == 0) CenterNumCellz=1
 
     SpanX(2) = SpanX(1) + NumCellx*DCell
     SpanY(2) = SpanY(1) + NumCelly*DCell
@@ -242,8 +283,8 @@ contains
 
     allocate(grid_list(nb_component, nb_gridnode))
     allocate(node_list(nb_gridnode))
-    if(SGMP)then
     allocate(cell_list(nb_centernode))
+    if(SGMP)then
     allocate(cellp_list(nb_centernode))
     end if
 
@@ -259,7 +300,20 @@ contains
              node_list(i)%Xg(1) = (ix - 1)*DCell + SpanX(1)
              node_list(i)%Xg(2) = (iy - 1)*DCell + SpanY(1)
              node_list(i)%Xg(3) = (iz - 1)*DCell + SpanZ(1)
-
+             if(ix==1.and.FixS(1))    node_list(i)%bd_type(1)=1
+             if(ix==NGx.and.FixS(2))  node_list(i)%bd_type(1)=2
+             if(iy==1.and.FixS(3))    node_list(i)%bd_type(2)=1
+             if(iy==NGy.and.FixS(4))  node_list(i)%bd_type(2)=2
+             if(iz==1.and.FixS(5))    node_list(i)%bd_type(3)=1
+             if(iz==NGz.and.FixS(6))  node_list(i)%bd_type(3)=2
+             if(sgmp) then
+                  if(ix==2.and.FixS(1)/=0)      node_list(i)%bd_type(1)=1
+                  if(ix==NGx-1.and.FixS(2)/=0)  node_list(i)%bd_type(1)=2
+                  if(iy==2.and.FixS(3)/=0)      node_list(i)%bd_type(2)=1
+                  if(iy==NGy-1.and.FixS(4)/=0)  node_list(i)%bd_type(2)=2
+                  if(iz==2.and.FixS(5)/=0)      node_list(i)%bd_type(3)=1
+                  if(iz==NGz-1.and.FixS(6)/=0)  node_list(i)%bd_type(3)=2
+             end if
         if(Bspline.or.gimp.or.sgmp)then
                  if (((ix==1.or.ix==2).and.FixS(1)==1).or.((ix==NGx.or.ix==NGx-1).and.FixS(2)==1).or. &
                  ((iy==1.or.iy==2).and.FixS(3)==1).or.((iy==NGy.or.iy==NGy-1).and.FixS(4)==1).or. &
@@ -267,16 +321,16 @@ contains
                 node_list(i)%Fix_x = .true.
                 node_list(i)%Fix_y = .true.
                 node_list(i)%Fix_z = .true.
-             end if
+                end if
 
              if (((ix==1.or.ix==2).and.FixS(1)==2).or.((ix==NGx.or.ix==NGx-1).and.FixS(2)==2)) then
                 node_list(i)%Fix_x = .true.
              end if
-
+             
              if (((iy==1.or.iy==2).and.FixS(3)==2).or.((iy==NGy.or.iy==NGy-1).and.FixS(4)==2)) then
                 node_list(i)%Fix_y = .true.
              end if
-
+             
              if (((iz==1.or.iz==2).and.FixS(5)==2).or.((iz==NGz.or.iz==NGz-1).and.FixS(6)==2)) then
                 node_list(i)%Fix_z = .true.
              end if
@@ -323,7 +377,7 @@ contains
              CellsNode(i,6) = Node5 + 1
              CellsNode(i,7) = Node5 + 1 + NGx
              CellsNode(i,8) = Node5 +NGx
-             if(SGMP)cell_list(i)%Cxg=node_list(CellsNode(i,1))%Xg+DCell/2.0
+             cell_list(i)%Cxg=node_list(CellsNode(i,1))%Xg+DCell/2.0
           end do
        end do
     end do
@@ -377,70 +431,41 @@ end if
 
   end subroutine SetContact_GridNodeData
   
-  subroutine SGNShape(node1, p, ider)
+  subroutine SGNShape(xxn)
 !------------------------------------------------------------------
 !- Shape function for SGMP
 !-  Purpose                                                       -
-!-      Evaluate the shape functions and/or their derivatives     -
+!-      Evaluate the shape functions and                          -
 !-      at particle p associated with nodes of the cell in        -
 !-      which the particle p is located                           -
 !-  Inputs                                                        -
-!-      node1 - number of the first node of the cell in which the -
-!-              particle p is located                             -
-!-      p     - particle number                                   -
-!-      ider  - flag for shape function and derivative calculation-
-!-              0 - shape functions only                          -
-!-              1 - derivatives only                              -
-!-              2 - both shape functions and their derivatives    -
+!-      xxn - particle natural coordinates in the auxiliary grid  -
 !-  Outputs                                                       -
 !-      SHP(8)   - value of shape functions                       -
-!-      DNDX(8)  - value of derivative with respect to            -
-!-                 X of shape function                            -
-!-      DNDY(8)  - value of derivative with respect to            -
-!-                 Y of shape function                            -
-!-      DNDZ(8)  - value of derivative with respect to            -
-!-                 Z of shape function                            -   
 !------------------------------------------------------------------
     use ParticleData
     implicit none
+    real(8), intent(in):: xxn(3)! nature coordinate ( -1 < x,y,z < 1 )
 
-    integer, intent(in):: node1, p, ider
-
-    real(8):: x(3) ! nature coordinate ( -1 < x,y,z < 1 )
     real(8):: sx(8), sy(8), sz(8)
 
-    type(Particle), POINTER :: pt
-    type(CellData), POINTER :: node
+    sx = SNX*xxn(1) + 1d0    ! 1 + xi(i)  * xi
+    sy = SNY*xxn(2) + 1d0    ! 1 + eta(i) * eta
+    sz = SNZ*xxn(3) + 1d0    ! 1 + zeta(i)* zeta
 
-    node => cell_list(node1)
-    pt => particle_list(p)
-
-    x = (pt%Xp - node%Cxg)*iJacobi - 1d0
-
-    sx = SNX*x(1) + 1d0    ! 1 + xi(i)  * xi
-    sy = SNY*x(2) + 1d0    ! 1 + eta(i) * eta
-    sz = SNZ*x(3) + 1d0    ! 1 + zeta(i)* zeta
-
-    if (ider .NE. 1) SHP = sx * sy * sz * 0.125d0
-
-    if (ider .NE. 0) then
-       DNDX = SNX * sy * sz * iJacobi4
-       DNDY = SNY * sx * sz * iJacobi4
-       DNDZ = SNZ * sx * sy * iJacobi4
-    end if
+   SHP = sx * sy * sz * 0.125d0
 
   end subroutine SGNShape
+  
 
-  subroutine NShape(node1, p, ider)
+  subroutine NShape(XN,ider) 
 !------------------------------------------------------------------
 !-  Purpose                                                       -
 !-      Evaluate the shape functions and/or their derivatives     -
 !-      at particle p associated with nodes of the cell in        -
 !-      which the particle p is located                           -
 !-  Inputs                                                        -
-!-      node1 - number of the first node of the cell in which the -
-!-              particle p is located                             -
-!-      p     - particle number                                   -
+!-  XN(3) - particle natural coordinates in the background grid   -
 !-      ider  - flag for shape function and derivative calculation-
 !-              0 - shape functions only                          -
 !-              1 - derivatives only                              -
@@ -454,25 +479,16 @@ end if
 !-      DNDZ(8)  - value of derivative with respect to            -
 !-                 Z of shape function                            -   
 !------------------------------------------------------------------
-    use ParticleData
     implicit none
 
-    integer, intent(in):: node1, p, ider
+    integer, intent(in)::  ider
+    real(8),intent(in)::XN(3)! nature coordinate ( -1 < x,y,z < 1 )
 
-    real(8):: x(3) ! nature coordinate ( -1 < x,y,z < 1 )
     real(8):: sx(8), sy(8), sz(8)
-
-    type(Particle), POINTER :: pt
-    type(GridNode), POINTER :: node
-
-    node => node_list(node1)
-    pt => particle_list(p)
-
-    x = (pt%Xp - node%Xg)*iJacobi - 1d0
-
-    sx = SNX*x(1) + 1d0    ! 1 + xi(i)  * xi
-    sy = SNY*x(2) + 1d0    ! 1 + eta(i) * eta
-    sz = SNZ*x(3) + 1d0    ! 1 + zeta(i)* zeta
+   
+    sx = SNX*XN(1) + 1d0    ! 1 + xi(i)  * xi
+    sy = SNY*XN(2) + 1d0    ! 1 + eta(i) * eta
+    sz = SNZ*XN(3) + 1d0    ! 1 + zeta(i)* zeta
 
     if (ider .NE. 1) SHP = sx * sy * sz * 0.125d0
 
@@ -517,7 +533,7 @@ end if
     sy = SNY*x(2) + 1d0    ! 1 + eta(i) * eta
     sz = SNZ*x(3) + 1d0    ! 1 + zeta(i)* zeta
 
-    if (ider .NE. 1) CSHP = sx * sy * sz * 0.125d0
+    !if (ider .NE. 1) CSHP = sx * sy * sz * 0.125d0
 
     if (ider .NE. 0) then
        CDNDX = SNX * sy * sz * iJacobi4
@@ -526,7 +542,7 @@ end if
     end if
 
   end subroutine CNShape
-
+  
   subroutine NShape_GIMP(p)
 !------------------------------------------------------------------
 !-  Purpose                                                       -
@@ -582,6 +598,7 @@ end if
 
   end subroutine NShape_GIMP
 
+ 
   subroutine FindInflNode(p, icell)
 !------------------------------------------------------------------
 !-  Purpose: Find Influence Nodes for particle p                  -

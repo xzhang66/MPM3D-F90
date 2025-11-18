@@ -1,0 +1,45 @@
+mpm3d *** 3D DamBreak_withoutBarrier
+!References:Cheng, Zhang, et al. Stabilized explicit material point method for fluid flow and fluid-structure interaction simulations using dual high-order B-spline volume averaging[J]. Computer Methods in Applied Mechanics and Engineering 448 (2026): 118428.
+!Compare pressure chart with reference literature
+! Unit: m  Kg  N  s  Pa
+nbco 1
+nbbo 1
+nbmp 28800
+nmat 1
+
+spx   -0.0019 0.2869
+spy   -0.0019 0.1159
+spz   0 0.0019
+dcell  0.0019
+
+dtscale 0.9
+endtime 0.14
+
+outtime 0.001
+rpttime 0.0005
+
+musl on
+sgmp
+smoo
+bulk 1.5 0.5
+
+para
+curv disy 28681
+curv disx 120
+
+!      x0  xn  y0  yn  z0 zn
+fixed  2   0   2   0    2    2
+
+material
+!  num     mtype  density   BulkModulus miu
+1              null       1000          2.0e7       0.001
+seos 1 4 141.5
+
+ Particle block 1 
+! matid density    dp         0x 0y      0z           nx    ny    nz
+      1      1000   4.75e-4      0    0   7.125e-4   120  240    1
+load
+grav  1 0 -9.81 0 
+endl
+ 
+endi

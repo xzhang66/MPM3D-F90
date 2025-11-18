@@ -28,12 +28,13 @@ module DataOut
   integer:: nCvs = 0
   integer:: nAnm = 0
 
-  integer, parameter:: nVariables = 16
+  integer, parameter:: nVariables = 18
   character(4), parameter:: OutputName(nVariables) = (/ &
        'seqv','epef','mat ','pres','volu',  &
        'engk','engi','velx','vely','velz',  &
-       'cels','fail','sspd','damg','stressx','disx'&
-       /)
+       'cels','fail','sspd','damg','stressx','disx',&
+      'disy','disz'/)
+       
 
   logical:: WriteTecPlot  = .false.
   logical:: WriteParaView = .false.
@@ -128,6 +129,10 @@ contains
           write(iow2,"(e12.4)", advance='no') pt%SDxx+pt%SM
         case(16) !disx
           write(iow2,"(e12.4)", advance='no') pt%Xp(1)-pt%Xo(1)
+        case(17) !disy
+          write(iow2,"(e12.4)", advance='no') pt%Xp(2)-pt%Xo(2)
+        case(18) !disz
+          write(iow2,"(e12.4)", advance='no') pt%Xp(3)-pt%Xo(3)
        end select
 
     end do
@@ -226,7 +231,7 @@ contains
                 write(iow1,"(e12.4)", advance='no') pt%DMG
              case(15) !stressx
                 write(iow1,"(e12.4)", advance='no') pt%SDxx+pt%SM
-             case(16) !stressx
+             case(16) !disx
                 write(iow1,"(e12.4)", advance='no') pt%Xp(1)-pt%Xo(1)
              end select
           end do ! i
@@ -331,6 +336,30 @@ contains
         write(iow11, "(A,e12.4)") indent//indent//indent//indent, -pt%SM
     end do !p
     write(iow11,32) indent//indent//indent, 'DataArray' ! close 'pressure'
+    
+    ! Smoothpressure
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'Smoothpressure'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%Spre
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'Smoothpressure'
+    
+   ! MeanNormalStress
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'MeanNormalStress'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, pt%SM
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'MeanNormalStress'
+    
+    ! SmoothMeanNormalStress
+    write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'SmoothMeanNormalStress'
+    do p = 1, nb_particle
+        pt => particle_list(p)
+        write(iow11, "(A,e12.4)") indent//indent//indent//indent, -pt%Spre
+    end do !p
+    write(iow11,32) indent//indent//indent, 'DataArray' ! close 'SmoothMeanNormalStress
 
     ! vx
     write(iow11,33) indent//indent//indent, 'DataArray', 'Float32', 'vx'
