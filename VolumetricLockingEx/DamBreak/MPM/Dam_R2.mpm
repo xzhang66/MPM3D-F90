@@ -1,0 +1,43 @@
+mpm3d *** 3D DamBreak_withoutBarrier
+!References:Mast C M, et al. Mitigating kinematic locking in the material point method[J]. Journal of Computational Physics, 2012
+! Unit: m  Kg  N  s  Pa
+nbco 1
+nbbo 1
+nbmp 3200
+nmat 1
+
+spx   0 4.125
+spy   0 2.125
+spz   0 0.125
+dcell  0.125
+
+dtscale 0.8
+endtime 0.68
+
+outtime 0.01
+rpttime 0.002
+
+musl on
+smoo
+bulk 1.5 0.06
+
+para
+curv disy 3161
+curv disx 40
+
+!      x0  xn  y0  yn  z0 zn
+fixed  2   0   2   0    2    2
+
+material
+!  num     mtype  density   BulkModulus miu
+1              null       997.5          2.0e9             0.001
+seos 1 4 1415
+
+ Particle block 1 
+! matid density    dp         0x 0y      0z      nx    ny    nz
+      1      997.5   0.025      0    0    0.05     40    80    1
+load
+grav  1 0 -9.81 0 
+endl
+ 
+endi

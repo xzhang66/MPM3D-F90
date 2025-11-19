@@ -24,6 +24,7 @@ module MaterialData
      integer:: MatType    ! Material type
      integer:: EosType    ! EOS type
      real(8):: Density    ! Initial density
+     real(8):: miu        ! dynamic viscosity
      real(8):: Young      ! Young's modulus
      real(8):: Poisson    ! Poisson's ratio
      real(8):: Mp         ! Partical mass
@@ -42,6 +43,7 @@ module MaterialData
      real(8):: D        ! Detonation velocity
      real(8):: cEos(10) = 0    ! Constants in Equation of State
      real(8):: Wavespd         ! wavespeed of Null material
+     real(8):: BulkModulus      !bulk modulus 
      ! Parameters for Drucker-Prager soil material
      real(8):: q_fai, k_fai, q_psi, ten_f  
   end type Material

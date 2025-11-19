@@ -19,7 +19,7 @@ module MaterialModel
   use MaterialData
 
   private  
-  public Constitution
+  public Constitution,TLConstitution
 
   integer:: mid       ! material set id
   integer:: etype_    ! Type of EOS
@@ -37,9 +37,13 @@ module MaterialModel
   real(8):: dvol      ! 0.5 * volume increment 
 
   real(8):: dinc(6)   ! strain increment
+  real(8):: deF(3,3)    ! Deformation Gradient tensor increcment
   real(8):: sm        ! Mean stress
   real(8):: smold     ! mean stress of last step
-  real(8):: sd(6)     ! deviatoric stress      
+  real(8):: sd(6)     ! deviatoric stress     
+  real(8):: Fp(3,3)   !Deformation Gradient tensor   
+  real(8):: ppk_old(9)! Particle 1st PK stress at step n only for TLMPM
+  real(8):: ppk_new(9)! Particle 1st PK stress at step n+1 only for TLMPM
   real(8):: sig(6)    ! stress components        
   real(8):: sold(6)   ! deviatoric stress of step n
   real(8):: dsm
@@ -52,7 +56,8 @@ module MaterialModel
   real(8):: ratio     ! for hardening caculation
 
   real(8):: G2, K3, PlaMod ! 2*G, 3*K, plastic hardening modulus
-
+  real(8):: lamda
+  real(8):: miu2       !2*miu
   real(8):: specheat_
   real(8):: tmprt     ! temperature
 
@@ -67,10 +72,11 @@ module MaterialModel
   
   real(8):: DMG       ! Damage
   real(8):: oldDMG    ! Damage of last step
+  
 
 contains
 
-  subroutine Constitution(de, vort, b, p)
+  subroutine Constitution(de, vort, b, p, deFp)
 !------------------------------------------------------------------
 !-  Purpose                                                       -
 !-      Update stresses by using a constitution model             -
@@ -80,6 +86,8 @@ contains
 !-      vort  - vorticity * DT (W32, W13, W21)*DT                 -
 !-      b     - body index                                        -
 !-      p     - particle index                                    -
+!-      deFp  - Velocity gradient                                 -
+!-              -used to update gradient deformation tensor       -
 !-    Outputs:                                                    -
 !-        stress component                                        -
 !-    Note:                                                       -
@@ -90,22 +98,39 @@ contains
     implicit none
 
     integer, intent(in):: b, p
-    real(8), intent(in):: de(6), vort(3)
+    real(8), intent(in):: de(6), vort(3),deFp(3,3)
+    integer:: i
 
     real(8):: mp_
     real(8):: ltim
-    logical:: failure
+    logical:: failure,cpIsCal
     real(8):: DMGRatio
+    real(8):: detF
 
     ! Pick parameters
     dinc = de
+    deF = deFp
 
     ! Volume at time step t
     vold = particle_list(p)%VOL
     ! Current volume
-    particle_list(p)%VOL = vold*(1+de(1)+de(2)+de(3))    
-    vol_ = particle_list(p)%VOL
-    dvol = 0.5 * (vol_ - vold)
+    if(UpdateVbyFp) then
+        Fp = particle_list(p)%Fp
+        do i = 1,3
+            deF(i,i) = deF(i,i)+ 1.0
+            Fp(i,i) = Fp(i,i) + 1.0
+        end do
+        detF = deF(1,1)*deF(2,2)*deF(3,3)-deF(1,1)*deF(2,3)*deF(3,2)-&
+               deF(2,1)*deF(1,2)*deF(3,3)+deF(2,1)*deF(1,3)*deF(3,2)+&
+               deF(3,1)*deF(1,2)*deF(2,3)-deF(3,1)*deF(1,3)*deF(2,2)
+        particle_list(p)%VOL = vold*detF
+        vol_ = particle_list(p)%VOL
+        dvol = 0.5 * (vol_ - vold)
+    else
+        particle_list(p)%VOL = vold*(1+de(1)+de(2)+de(3))    
+        vol_ = particle_list(p)%VOL
+        dvol = 0.5 * (vol_ - vold)
+    end if
 
     if (vol_ .lt. 0) then
         write(*,*) '=== warning: negative volume at particle', p
@@ -126,6 +151,7 @@ contains
 
     mtype_ = mat_list(mid)%MatType
     etype_ = mat_list(mid)%EosType
+    miu2 = 2*mat_list(mid)%miu
 
     young_ = mat_list(mid)%Young       ! Young's Modulus
     poisson_ = mat_list(mid)%Poisson   ! Poisson Ratio
@@ -145,10 +171,15 @@ contains
     young_ = young_*(1.0-DMG+epsilon(1.0d0))
     G2 = young_ / (1 + poisson_)
     K3 = young_ / (1 - 2*poisson_)
+    lamda = (young_* poisson_)/((1+poisson_)*(1-2*poisson_))
     PlaMod = young_ * tangmod_ / (young_ - tangmod_)
+    
+    cp = particle_list(p)%cp
 
     sm = particle_list(p)%SM           ! Mean stress
     smold = particle_list(p)%SM        ! Mean stress of last step
+    
+   
 
     sd(1) = particle_list(p)%SDxx      ! deviatoric stress
     sd(2) = particle_list(p)%SDyy
@@ -238,7 +269,7 @@ contains
           end if
           particle_list(p)%failure = failure
        else
-          call M3DM7()
+          call M3DM7(DT)
           call seleos(failure)
        end if
 
@@ -282,7 +313,7 @@ contains
           particle_list(p)%celsius_t = particle_list(p)%celsius_t &
                                        + seqv*depeff/den_/specheat_
        else
-          call M3DM7()
+          call M3DM7(DT)
           call seleos(failure)
        end if
 
@@ -293,13 +324,18 @@ contains
 
     case(9)
        ! null: used to model air
-       call M3DM7()
+       call M3DM7(DT)
        call seleos(failure)
 
     case(10) 
        ! Drucker-Prager elastic-perfectly plastic
        call sigrot(vort, sig, sm, sd)
        call M3DM9(mat_list(mid), DT)
+       call lieupd()
+   case(11) 
+       ! neoh: Neohookean model
+      ! call sigrot(vort, sig, sm, sd)    ! Rotate stress
+       call M3DM10()
        call lieupd()
 
     case default 
@@ -330,6 +366,162 @@ contains
     particle_list(p)%q = bqf
 
   end subroutine Constitution
+  
+  subroutine TLConstitution(de,vort,b, p,deFp)
+!------------------------------------------------------------------
+!-  Purpose                                                       -
+!-      Update stresses by using a constitution model for TLMPM   -
+!-  Currently,only the NeoHookean constitutive model is supported -       
+!-  Inputs:                                                       -
+!-      de - strain increment                                     -
+!-             (D11, D22, D33, 2D23, 2D13, 2D12)*DT               -
+!-      vort  - vorticity * DT (W32, W13, W21)*DT                 -
+!-      b     - body index                                        -
+!-      p     - particle index                                    -
+!-    Outputs:                                                    -
+!-        stress component                                        -
+!-    Note:                                                       -
+!-        sd(i) and de(i) comply the Voigt rule                   -
+!------------------------------------------------------------------
+    use ParticleData
+
+    implicit none
+
+    integer, intent(in):: b, p
+    real(8), intent(in):: de(6), vort(3),deFp(3,3)
+    integer:: i
+
+    real(8):: mp_
+    real(8):: ltim
+    logical:: failure,cpIsCal
+    real(8):: DMGRatio
+    real(8):: detF
+
+    ! Pick parameters
+    dinc = de
+
+    deF = deFp
+    
+    do i = 1,9
+       ppk_new(i)= 0
+       ppk_old(i)=particle_list(p)%PK(i)
+    end do
+
+    ! Volume at time step t
+    vold = particle_list(p)%VOL
+    ! Current volume
+    
+    Fp = particle_list(p)%Fp
+    do i = 1,3
+        Fp(i,i) = Fp(i,i) + 1.0
+    end do
+    detF = Fp(1,1)*Fp(2,2)*Fp(3,3)-Fp(1,1)*Fp(2,3)*Fp(3,2)-&
+            Fp(2,1)*Fp(1,2)*Fp(3,3)+Fp(2,1)*Fp(1,3)*Fp(3,2)+&
+            Fp(3,1)*Fp(1,2)*Fp(2,3)-Fp(3,1)*Fp(1,3)*Fp(2,2)
+    particle_list(p)%VOL = detF*particle_list(p)%VOL0
+    vol_ = particle_list(p)%VOL
+    dvol = 0.5 * (vol_ - vold)
+
+
+    if (vol_ .lt. 0) then
+        write(*,*) '=== warning: negative volume at particle', p
+    end if
+    mid = body_list(b)%mat
+    
+    seqv = particle_list(p)%seqv       ! 2005-8-13
+
+    failure = particle_list(p)%failure
+
+    mtype_ = mat_list(mid)%MatType
+    etype_ = mat_list(mid)%EosType
+    miu2 = 2*mat_list(mid)%miu
+
+    young_ = mat_list(mid)%Young       ! Young's Modulus
+    poisson_ = mat_list(mid)%Poisson   ! Poisson Ratio
+    yield0_ = mat_list(mid)%Yield0     ! Yield limit
+    tangmod_ = mat_list(mid)%TangMod   ! Tangential modulus
+
+    den0_ = mat_list(mid)%Density      ! Initial density
+    vol0_ = mp_/den0_                  ! Initial volume
+    den_ = mp_/vol_                    ! Current density
+    mu = den_/den0_ - 1
+
+
+    DMG = particle_list(p)%DMG
+    oldDMG = DMG
+    young_ = young_*(1.0-DMG+epsilon(1.0d0))
+    G2 = young_ / (1 + poisson_)
+    K3 = young_ / (1 - 2*poisson_)
+    lamda = (young_* poisson_)/((1+poisson_)*(1-2*poisson_))
+    PlaMod = young_ * tangmod_ / (young_ - tangmod_)
+    
+    cp = particle_list(p)%cp
+
+    sm = particle_list(p)%SM           ! Mean stress
+    smold = particle_list(p)%SM        ! Mean stress of last step
+    
+    iener = particle_list(p)%ie
+
+    sd(1) = particle_list(p)%SDxx      ! deviatoric stress
+    sd(2) = particle_list(p)%SDyy
+    sd(3) = particle_list(p)%SDzz
+    sd(4) = particle_list(p)%SDyz
+    sd(5) = particle_list(p)%SDxz
+    sd(6) = particle_list(p)%SDxy
+
+    sig(1) = sd(1) + sm        ! cauchy stress
+    sig(2) = sd(2) + sm
+    sig(3) = sd(3) + sm
+    sig(4) = sd(4)
+    sig(5) = sd(5)
+    sig(6) = sd(6)
+
+    sold = sd    ! cauchy stress at time step t
+    
+    bqf = 0.0    ! bulk viscosity
+
+    ! Select material model
+
+    select case(mtype_)
+ 
+    case(11) 
+       ! neoh: Neohookean model
+       call M3DM11()
+       !call lieupd()
+
+    case default 
+       write(*, 11) mtype_
+11     format(1x,'*** Stop *** material type ', i2, &
+              ' has not been implemented ! Or Currently,only the NeoHookean constitutive model is supported For TLMPM')
+       stop
+
+    end select
+
+    ! Write stress result
+    
+   do i = 1,9
+       particle_list(p)%PK(i) = ppk_new(i)   
+   end do
+
+    particle_list(p)%SM = sm
+    particle_list(p)%Seqv = seqv
+
+    particle_list(p)%SDxx = sd(1)
+    particle_list(p)%SDyy = sd(2)
+    particle_list(p)%SDzz = sd(3)
+    particle_list(p)%SDyz = sd(4)
+    particle_list(p)%SDxz = sd(5)
+    particle_list(p)%SDxy = sd(6)
+
+    particle_list(p)%sig_y = sig_y_
+    particle_list(p)%epeff = epeff_
+
+    particle_list(p)%ie = iener
+    particle_list(p)%cp = cp
+    particle_list(p)%q = bqf
+
+  end subroutine TLConstitution
+
 
 
   subroutine sigrot(vort, sig, sm, sd)
@@ -528,7 +720,166 @@ contains
             (sd(3)+sm)*dinc(3) +sd(4)*dinc(4) + sd(5)*dinc(5) + &
             sd(6)*dinc(6)     ! (part of Eq: 5.10)
 
+
   end subroutine M3DM1
+ subroutine M3DM10()
+!------------------------------------------------------------------
+!-  Purpose                                                       -
+!-      NeoHookean material model                                 -
+!-                                                                -
+!------------------------------------------------------------------
+    implicit none
+    real(8):: B(6)
+    real(8):: J,G,iJ
+
+    G = 0.5*G2    ! Shear modulus
+    J = Fp(1,1)*Fp(2,2)*Fp(3,3)-Fp(1,1)*Fp(2,3)*Fp(3,2)-&
+        Fp(2,1)*Fp(1,2)*Fp(3,3)+Fp(2,1)*Fp(1,3)*Fp(3,2)+&
+        Fp(3,1)*Fp(1,2)*Fp(2,3)-Fp(3,1)*Fp(1,3)*Fp(2,2)
+    
+    B(1) = Fp(1,1)*Fp(1,1)+Fp(1,2)*Fp(1,2)+Fp(1,3)*Fp(1,3)-1.0
+    B(2) = Fp(2,1)*Fp(2,1)+Fp(2,2)*Fp(2,2)+Fp(2,3)*Fp(2,3)-1.0
+    B(3) = Fp(3,1)*Fp(3,1)+Fp(3,2)*Fp(3,2)+Fp(3,3)*Fp(3,3)-1.0
+    B(4) = Fp(1,1)*Fp(2,1)+Fp(1,2)*Fp(2,2)+Fp(1,3)*Fp(2,3) !corresponding to corresponds to
+    B(5) = Fp(2,1)*Fp(3,1)+Fp(2,2)*Fp(3,2)+Fp(2,3)*Fp(3,3) !corresponding to yz
+    B(6) = Fp(1,1)*Fp(3,1)+Fp(1,2)*Fp(3,2)+Fp(1,3)*Fp(3,3) !corresponding to xz
+    
+    
+    ieinc = sig(1)*dinc(1) + sig(2)*dinc(2) + sig(3)*dinc(3) +   &
+         sig(4)*dinc(4) + sig(5)*dinc(5) + sig(6)*dinc(6)    
+    
+    iJ = 1.0/J
+
+    sig(1)=iJ*(G*B(1)+lamda*log(J)*1.0)
+    sig(2)=iJ*(G*B(2)+lamda*log(J)*1.0)
+    sig(3)=iJ*(G*B(3)+lamda*log(J)*1.0)
+    !Note that sig(4) corresponds to yz¡¢sig(5) to xz¡¢ sig(6) to xy according to the Voigt rule
+    !Whille B(4)corresponds to xy ¡¢B(5)to yz¡¢ B(6)to xz
+    sig(4)=iJ*G*B(5)
+    sig(5)=iJ*G*B(6)
+    sig(6)=iJ*G*B(4)
+    
+    sm = (sig(1)+sig(2)+sig(3))/3d0
+    
+    sd(1) = sig(1) - sm
+    sd(2) = sig(2) - sm
+    sd(3) = sig(3) - sm
+    sd(4) = sig(4)
+    sd(5) = sig(5)
+    sd(6) = sig(6)
+
+
+    seqv = EquivalentStress()
+
+    ieinc = ieinc + (sd(1)+sm)*dinc(1) + (sd(2)+sm)*dinc(2) +   &
+            (sd(3)+sm)*dinc(3) +sd(4)*dinc(4) + sd(5)*dinc(5) + &
+            sd(6)*dinc(6)     ! (part of Eq: 5.10)
+    
+
+
+ end subroutine M3DM10
+ 
+ subroutine M3DM11()
+!------------------------------------------------------------------
+!-  Purpose                                                       -
+!-      NeoHooke material model for TLMPM                         -
+!------------------------------------------------------------------
+    implicit none
+    real(8):: FIT(9),F(9),FT(9),deltaFp(9)
+    real(8):: J,G ,ppk_mid(9)
+    integer:: i
+    
+    G = 0.5*G2    ! Shear modulus
+    
+     J = Fp(1,1)*Fp(2,2)*Fp(3,3)-Fp(1,1)*Fp(2,3)*Fp(3,2)-&
+        Fp(2,1)*Fp(1,2)*Fp(3,3)+Fp(2,1)*Fp(1,3)*Fp(3,2)+&
+        Fp(3,1)*Fp(1,2)*Fp(2,3)-Fp(3,1)*Fp(1,3)*Fp(2,2)
+     
+ 
+    !calculate the transpose matrix of the inverse matrix of Fp
+    ! 11-xx-1 22-yy-2 33-zz-3 12-xy-6 13-xz-5 21-yx-9 23-yz-4 31-zx-8 32-zy-7
+     
+    F(1) = Fp(1,1)
+    F(2) = Fp(2,2)
+    F(3) = Fp(3,3)
+    F(4) = Fp(2,3)
+    F(5) = Fp(1,3)
+    F(6) = Fp(1,2)
+    F(7) = Fp(3,2)
+    F(8) = Fp(3,1)
+    F(9) = Fp(2,1)
+    
+    FIT(1) = (F(2)*F(3)-F(4)*F(7))/J
+    FIT(2) = (F(1)*F(3)-F(5)*F(8))/J
+    FIT(3) = (F(1)*F(2)-F(6)*F(9))/J
+    FIT(4) = (F(6)*F(8)-F(1)*F(7))/J
+    FIT(5) = (F(9)*F(7)-F(2)*F(8))/J
+    FIT(6) = (F(4)*F(8)-F(3)*F(9))/J
+    FIT(7) = (F(5)*F(9)-F(4)*F(1))/J
+    FIT(8) = (F(4)*F(6)-F(5)*F(2))/J
+    FIT(9) = (F(5)*F(7)-F(6)*F(3))/J
+     
+  
+    do i = 1,9
+        ppk_new(i)=G*(F(i)-FIT(i))+lamda*log(J)*FIT(i)
+    end do
+    
+    !calculate the transpose matrix of  Fp
+    FT(1) =  F(1)
+    FT(2) =  F(2)
+    FT(3) =  F(3)
+    FT(4) =  F(7)
+    FT(5) =  F(8)
+    FT(6) =  F(9)
+    FT(7) =  F(4)
+    FT(8) =  F(5)
+    FT(9) =  F(6)
+    
+    
+    sig(1)=(ppk_new(1)*FT(1)+ppk_new(6)*FT(9)+ppk_new(5)*FT(8))/J
+    sig(2)=(ppk_new(9)*FT(6)+ppk_new(2)*FT(2)+ppk_new(4)*FT(7))/J
+    sig(3)=(ppk_new(8)*FT(5)+ppk_new(7)*FT(4)+ppk_new(3)*FT(3))/J
+    sig(4)=(ppk_new(9)*FT(5)+ppk_new(2)*FT(4)+ppk_new(4)*FT(3))/J
+    sig(5)=(ppk_new(1)*FT(5)+ppk_new(6)*FT(4)+ppk_new(5)*FT(3))/J
+    sig(6)=(ppk_new(1)*FT(6)+ppk_new(6)*FT(2)+ppk_new(5)*FT(7))/J
+    
+    
+    sm = (sig(1)+sig(2)+sig(3))/3d0
+
+    sd(1) = sig(1) - sm
+    sd(2) = sig(2) - sm
+    sd(3) = sig(3) - sm
+    sd(4) = sig(4)
+    sd(5) = sig(5)
+    sd(6) = sig(6)
+    
+    seqv = EquivalentStress()!¼ÆËãmisesÓ¦Á¦
+    
+    
+    deltaFp(1) = deF(1,1)
+    deltaFp(2) = deF(2,2)
+    deltaFp(3) = deF(3,3)
+    deltaFp(4) = deF(2,3)
+    deltaFp(5) = deF(1,3)
+    deltaFp(6) = deF(1,2)
+    deltaFp(7) = deF(3,2)
+    deltaFp(8) = deF(3,1)
+    deltaFp(9) = deF(2,1)
+    
+     do i = 1,9
+        ppk_mid(i)=0.5*(ppk_old(i)+ppk_new(i))
+     end do
+    
+    ieinc = 0d0
+    
+     do i = 1,9
+        ieinc = ieinc +  ppk_mid(i)*deltaFp(i)
+     end do
+     
+    iener = iener + ieinc*0.5*(vol_ + vold)
+
+
+  end subroutine M3DM11
 
 
   subroutine M3DM2()
@@ -770,15 +1121,24 @@ contains
   end subroutine M3DM6
 
 
-  subroutine M3DM7()
+  subroutine M3DM7(DT)
 !------------------------------------------------------------------
 !-  Purpose                                                       -
 !-      Null material model                                       -
 !------------------------------------------------------------------
     implicit none
-
-    sd = 0.0
-
+    real(8),intent(in):: DT
+    real(8):: tri
+    sd = 0.0d0
+    tri=1/3*(dinc(1)/DT+dinc(2)/DT+dinc(3)/DT)
+    sd(1) = miu2*(dinc(1)/DT-tri)
+    sd(2) = miu2*(dinc(2)/DT-tri)
+    sd(3) = miu2*(dinc(3)/DT-tri)
+    sd(4) = 0.5*miu2*dinc(4)/DT
+    sd(5) = 0.5*miu2*dinc(5)/DT
+    sd(6) = 0.5*miu2*dinc(6)/DT
+   
+    
   end subroutine M3DM7
 
   subroutine M3DM8(mat, DT, tmprt, failure)
@@ -990,9 +1350,13 @@ contains
        call eos2(failure)
     case(3)
        call eos3(failure)
+    case(4)
+       call eos4(failure)
     case default
        stop "error eos id"
     end select
+    
+    
 
   end subroutine seleos
 
@@ -1145,7 +1509,36 @@ contains
     sm = -pnew
 
   end subroutine eos3
+  
+subroutine eos4(failure)
+!------------------------------------------------------------------                    -
+!-  Outputs                                                       -
+!-      sm  - mean stress (pressure)                              -
+!------------------------------------------------------------------
+    use ParticleData, only: EngInternal
+    implicit none
 
+    real(8):: pnew, c0
+    logical:: failure
+
+    ! initialize parameters
+    c0 = mat_list(mid)%cEos(1)
+    
+    ! bulk viscosity
+    if(sm < 0) then
+        call bulkq()
+    end if
+
+    call hieupd(failure)
+
+    pnew =c0*c0*(den_ - den0_)! Weakly compressible EOS
+    
+    if(failure .and. pnew < 0) pnew=0.0 
+    iener = iener - dvol * pnew        ! (Eq: 5.14)
+
+    sm = -pnew
+
+ end subroutine eos4
 
   subroutine bulkq()
 !------------------------------------------------------------------

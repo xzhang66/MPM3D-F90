@@ -1,0 +1,38 @@
+mpm3d ***  FreeSoftBeam_NeoHook_MPM
+! Unit: m  Kg  N  s  Pa
+nbco 1
+nbbo 1
+nbmp 2400
+nmat 1
+
+spx  -1.5  2
+spy   -0.1   6.1
+spz   0   0.1
+dcell  0.1
+
+dtscale 0.9
+endtime 3
+
+outtime 1.0d-1
+rpttime 1.0d-2
+
+musl on
+para
+
+curv disx 2400
+
+!      x0  xn  y0  yn  z0  zn
+fixed  0   0   0   0   2   2
+
+material
+!  num     mtype  density   E v
+    1        neoh  1100   17e6   0.499
+
+ Particle block 1 
+! matid density dp 0x 0y 0z nx ny nz
+    1     1100 0.05 -1 0 0.025 20 120 1
+velo
+vsin 1
+endv
+ 
+endi

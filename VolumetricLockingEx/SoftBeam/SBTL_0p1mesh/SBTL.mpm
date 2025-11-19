@@ -1,0 +1,44 @@
+mpm3d SoftBeam_TLMPM
+!References:Kadapa. Novel quadratic Bézier triangular and tetrahedral elements using existing mesh generators: Applications to linear nearly incompressible elastostatics and implicit and explicit elastodynamics[J]. IJNME, 2019
+! Unit: m  Kg  N  s  Pa
+nbco 1
+nbbo 1
+nbmp 2400
+nmat 1
+
+spx  -1.0  0
+spy   0   6.0
+spz   0   0.1
+dcell  0.1
+
+dtscale 0.9
+endtime 1.2
+
+outtime 1.0d-1
+rpttime 2.0d-2
+
+musl on
+smoo
+UVFp
+TLmp
+
+
+para
+curv disx 2400
+outr pres
+
+!      x0  xn  y0  yn  z0 zn
+fixed  0   0   1   0   2  2
+
+material
+!  num     mtype  density   E v
+    1      neoh 1100   17e6   0.499
+
+ Particle block 1 
+! matid density dp 0x 0y 0z nx ny nz
+    1     1100 0.05 -1 0 0.025 20  120 1
+velo
+body 1 10 0 0 
+endv
+ 
+endi

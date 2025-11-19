@@ -61,91 +61,198 @@ program MPM3D
 
   call cpu_time( t_bg )
   t0 = secnds(0.0)
+ 
 
-  ! Solving
-  do while(CurrentTime .le. EndTime)
-     call cpu_time( t_begin )
+! Solving
+!do while(CurrentTime .le. EndTime)
+if(.NOT.TLMPM) then
+      do while(.true.)
+        call cpu_time( t_begin )
 
-     istep = istep+1
-     CurrentTime = CurrentTime + DT
-     EngInternal = 0.0
+        istep = istep+1
+        CurrentTime = CurrentTime + DT
+        EngInternal = 0.0
 
-     ! Step 1: Initialize background grid nodal mass and Momentum
-     call GridMomentumInitial()  ! Eq.(3.46) and Eq.(3.47)
+        ! Step 1: Initialize background grid nodal mass and Momentum
+        call GridMomentumInitial()  ! Eq.(3.46) and Eq.(3.47)
 
-     if(USF) then
-	 ! Step 2: Apply boundary conditions 
+        if(USF) then
+	    ! Step 2: Apply boundary conditions 
 	    call ApplyBoundaryConditions()
-	 ! Step 3: Update particles stress 
+	    ! Step 3: Update particles stress 
         call ParticleStressUpdate() ! Eq.(3.49-3.50 ...)
-     end if
+        end if
 
-     ! Step 4: Calculate the grid nodal force
-     call GridMomentumUpdate() ! Eq.(3.52-3.54)
+        ! Step 4: Calculate the grid nodal force
+        call GridMomentumUpdate() ! Eq.(3.52-3.54)
 
-     ! Step 5: Integrate momentum equations on background grids
-     call IntegrateMomentum()  ! Eq.(3.55)
+        ! Step 5: Integrate momentum equations on background grids
+        call IntegrateMomentum()  ! Eq.(3.55)
 
-     ! Step 6: Detect contact grid node, calculate contact force and
-     !          adjust nodal momentum
-     if(Contact_type == 1) then
+        ! Step 6: Detect contact grid node, calculate contact force and
+        !          adjust nodal momentum
+        if(Contact_type == 1) then
         call Lagr_NodContact()
-     end if
+        end if
 
-     ! Step 7: Update particles position and velocity
-     call ParticlePositionUpdate() ! Eq.(3.56) and Eq.(3.57)
+        ! Step 7: Update particles position and velocity
+        call ParticlePositionUpdate() ! Eq.(3.56) and Eq.(3.57)
 
-     ! Step 8: Recalculate the grid node momentum for MUSL
-     if(MUSL) then
+        ! Step 8: Recalculate the grid node momentum for MUSL
+        if(MUSL) then
         call GridMomentumMUSL()    ! Eq.(3.58)
         call ApplyBoundaryConditions()
-     end if
+        end if
 
-     ! Step 9: Update particles stress for both USL and MUSL
-     if(.NOT. USF) then
+        ! Step 9: Update particles stress for both USL and MUSL
+        if(.NOT. USF) then
         call ParticleStressUpdate() ! Eq.(3.60-3.62 ...)
-     end if
+        end if
 
-     call calcEnergy()              ! Calculate kinetic energy
+        call calcEnergy()              ! Calculate kinetic energy
+        call UpdateDT()
+        if(SmoothStress) call SmoothStressbyGrid()
 
-     if(DR_DAMPING) then
+        if(DR_DAMPING) then
         call dynamicRelaxationDamping() ! Verify damping for quasi static solution
-     endif
+        endif
 
-     call cpu_time( t_end )
-     t_cpu = t_cpu + t_end - t_begin
+        call cpu_time( t_end )
+        t_cpu = t_cpu + t_end - t_begin
 
-     call OutCurve()    ! out put curve and animation data
+        call OutCurve()    ! out put curve and animation data
 
-     if (CurrentTime.ge.plt) then
+        if (CurrentTime.ge.plt) then
         plt = plt + OutTime
         write(*,*) 'Write output data'
         write(iomsg,*) 'Write output data'
 
         ! Write results in TecPlot format: current step
-	if (WriteTecPlot) call OutAnim()
+    if (WriteTecPlot) call OutAnim()
         
-	! Write results in ParaView format: current step
-	if (WriteParaView) call OutAnimPV(iplotstep)
-	iplotstep = iplotstep + 1
-     end if
+    ! Write results in ParaView format: current step
+    if (WriteParaView) call OutAnimPV(iplotstep)
+    iplotstep = iplotstep + 1
+        end if
 
-     ! report current computational progress
-     if (CurrentTime.ge.prt) then
+        ! report current computational progress
+        if (CurrentTime.ge.prt) then
         prt = prt + ReportTime
-        write(*,100) istep, CurrentTime, EngKinetic, &
-                     EngKinetic+EngInternal
-        write(iomsg,100) istep, CurrentTime, EngKinetic, &
-                         EngKinetic+EngInternal
-100     format(1x, "Step=", i6, 1p, "  T=", e10.3, "  &
-                K.E.=", e10.3, "  T.E.=", e10.3)
+        write(*,100) istep, CurrentTime,DT,EngKinetic, &
+                        EngKinetic+EngInternal
+        write(iomsg,100) istep, CurrentTime,DT,EngKinetic, &
+                            EngKinetic+EngInternal
+    100     format(1x, "Step=", i6, 1p, "   T=", e10.3, "   DT=",e10.3, &
+                "   K.E.=", e10.3, "  T.E.=", e10.3)
 
         write(*,300) Momentum(1),Momentum(2),Momentum(3)
         write(iomsg,300) Momentum(1),Momentum(2),Momentum(3)
-300     format(14x,"Mx=", e10.3, "   My=", e10.3, "   Mz=", e10.3)
-     end if
+    300     format(14x,"Mx=", e10.3, "   My=", e10.3, "   Mz=", e10.3)
+        end if
+        if(QuasiLoad) then
+            !Note that this is designed to calculate quasi_static problems such as Cook's membrane,
+            !The parameters(For example,0.0005 or 100 below) can be adjusted approprately according to the question
+            if ((CurrentTime > EndTime .AND. EngKinetic/(EngKinetic+EngInternal)<0.005).AND. CurrentTime > 100) exit
+        else
+            if (CurrentTime > EndTime)exit
+        end if
 
-  end do
+      end do
+else
+       call GridMassInitial()
+    
+       do while(.true.)
+        call cpu_time( t_begin )
+        istep = istep+1
+        CurrentTime = CurrentTime + DT
+        EngInternal = 0.0
+
+        ! Step 1: Initialize background grid nodal mass and Momentum
+        call TLGridMomentumInitial()  ! Eq.(3.46) and Eq.(3.47)
+
+        if(USF) then
+	    ! Step 2: Apply boundary conditions 
+	    call ApplyBoundaryConditions()
+	    ! Step 3: Update particles stress 
+        call TLParticleStressUpdate() ! Eq.(3.49-3.50 ...)
+        end if
+
+        ! Step 4: Calculate the grid nodal force
+        call TLGridMomentumUpdate() ! Eq.(3.52-3.54)
+
+        ! Step 5: Integrate momentum equations on background grids
+        call IntegrateMomentum()  ! Eq.(3.55)
+
+        ! Step 6: Detect contact grid node, calculate contact force and
+        !          adjust nodal momentum
+        if(Contact_type == 1) then
+        call Lagr_NodContact()
+        end if
+
+        ! Step 7: Update particles position and velocity
+        call ParticlePositionUpdate() ! Eq.(3.56) and Eq.(3.57)
+
+        ! Step 8: Recalculate the grid node momentum for MUSL
+        if(MUSL) then
+        call GridMomentumMUSL()    ! Eq.(3.58)
+        call ApplyBoundaryConditions()
+        end if
+
+        ! Step 9: Update particles stress for both USL and MUSL
+        if(.NOT. USF) then
+        call TLParticleStressUpdate() ! Eq.(3.60-3.62 ...)
+        end if
+
+        call calcEnergy()              ! Calculate kinetic energy
+        call UpdateDT()
+        if(SmoothStress) call TLSmoothStressbyGrid()
+
+        if(DR_DAMPING) then
+        call dynamicRelaxationDamping() ! Verify damping for quasi static solution
+        endif
+
+        call cpu_time( t_end )
+        t_cpu = t_cpu + t_end - t_begin
+
+        call OutCurve()    ! out put curve and animation data
+
+        if (CurrentTime.ge.plt) then
+        plt = plt + OutTime
+        write(*,*) 'Write output data'
+        write(iomsg,*) 'Write output data'
+
+        ! Write results in TecPlot format: current step
+    if (WriteTecPlot) call OutAnim()
+        
+    ! Write results in ParaView format: current step
+    if (WriteParaView) call OutAnimPV(iplotstep)
+    iplotstep = iplotstep + 1
+        end if
+
+        ! report current computational progress
+        if (CurrentTime.ge.prt) then
+        prt = prt + ReportTime
+        write(*,100) istep, CurrentTime,DT,EngKinetic, &
+                        EngKinetic+EngInternal
+        write(iomsg,100) istep, CurrentTime,DT,EngKinetic, &
+                            EngKinetic+EngInternal
+
+        write(*,300) Momentum(1),Momentum(2),Momentum(3)
+        write(iomsg,300) Momentum(1),Momentum(2),Momentum(3)
+     
+        end if
+        if(QuasiLoad) then
+            !Note that this is designed to calculate quasi_static problems such as Cook's membrane,
+            !The parameters(For example,0.0005 or 100 below) can be adjusted approprately according to the question
+            if ((CurrentTime > EndTime .AND. EngKinetic/(EngKinetic+EngInternal)<0.005).AND. CurrentTime > 100) exit
+        else
+            if (CurrentTime > EndTime)exit
+        end if
+
+      end do
+
+
+end if
 
   call cpu_time( t_ed )
   t1 = secnds(t0)

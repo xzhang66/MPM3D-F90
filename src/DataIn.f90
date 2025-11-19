@@ -112,7 +112,7 @@ contains
     integer key, i, tempI
     logical:: updateMethod = .false.
 
-    integer,parameter:: nbkw = 38
+    integer,parameter:: nbkw = 43
     character(4),parameter:: kw(nbkw) = (/ &
          'endi','mpm3','nbmp','endt','grid','spx ', &
          'spy ','spz ','dcel','dtsc','outt','rptt', &
@@ -120,7 +120,8 @@ contains
          'load','velo','outr','curv','seos','pt2d', &
          'curx','deto','tecp','bulk','gimp','cont', &
          'usf ','usl ','nbco','nbbo','para','drda', &
-         'bimp','sgmp'/)
+         'bimp','sgmp','smoo','TLmp','UVFp','QuLo',&
+         'Damp'/)
 
     do while(.true.)
        key = keyword(kw,nbkw)
@@ -324,11 +325,35 @@ contains
           write(*,"(a)") 'BSMPM is used'
           write(iomsg,"(a)") 'BSMPM is used'
           
-       case(38)   ! BSMPM
+       case(38)   ! SGMP
           SGMP = .true.
           write(*,"(a)") 'SGMP is used'
           write(iomsg,"(a)") 'SGMP is used'
           
+       case(39)   ! SmoothStressbyGrid
+           SmoothStress = .true.
+           write(*,"(a)") 'SmoothStressbyGrid is used'
+           write(iomsg,"(a)") 'SmoothStressbyGrid is used'
+           
+       case(40)   ! TLMPM
+           TLMPM = .true.
+           write(*,"(a)") 'TLMPM is used'
+           write(iomsg,"(a)") 'TLMPM is used'
+       case(41)   ! UpdateVbyFp
+            UpdateVbyFp = .true.
+            write(*,"(a)") 'UpdateVolumebyFp is used'
+            write(iomsg,"(a)") 'UpdateVolumebyFp is used'
+        case(42)   !  'QuasiLoad'
+            QuasiLoad = .true.
+            QuasiLoadTime = GetReal()
+            write(*,"(a)") 'QuasiLoad is on'
+            write(iomsg,"(a)") 'QuasiLoad is on'
+        case(43)   ! ,'QuasiDamp'
+            QuasiDamp = .true.
+            DampFactor = GetReal()
+            write(*,"(a)") 'QuasiDamp is on'
+            write(iomsg,"(a)") 'QuasiDamp is on'
+        
        case default ! error
           stop 'STOP - Error encountered in reading data'
 
@@ -350,10 +375,11 @@ contains
 
     integer i, t, mtype, matcount
 
-    integer,parameter:: nbkw = 10
+    integer,parameter:: nbkw = 11
     character(4),parameter:: kw(nbkw) = (/&
          'elas','pla1','pla2','john','sjc ',&
-         'sjcf','jcf ','hiex','null','dpm '/)
+         'sjcf','jcf ','hiex','null','dpm ',&
+         'neoh'/)
 
     if(nb_mat.eq.0 .or. nb_particle.eq.0) then
        stop '*** Error *** nb_mat/nb_particle must be defined in advance!'
@@ -457,10 +483,12 @@ contains
           mat_list(i)%Density = GetReal()
           mat_list(i)%D = GetReal()
 
-       case(9) ! null
+       case(9) ! null(used to model water)
           mat_list(i)%MatType = 9
           mat_list(i)%Density = GetReal()
-          mat_list(i)%Wavespd = GetReal()
+          mat_list(i)%BulkModulus = GetReal()
+          mat_list(i)%miu     = GetReal()
+          mat_list(i)%Wavespd = SQRT(mat_list(i)%BulkModulus/mat_list(i)%Density)
 
        case(10) ! drucker-prager model
           mat_list(i)%MatType = 10
@@ -471,6 +499,12 @@ contains
           mat_list(i)%k_fai = GetReal()
           mat_list(i)%q_psi = GetReal()
           mat_list(i)%ten_f = GetReal()    
+       case(11)    ! NeoHookean
+          mat_list(i)%MatType = 11
+          mat_list(i)%Density = GetReal()
+          mat_list(i)%Young = GetReal()
+          mat_list(i)%Poisson = GetReal()
+          UpdateVbyFp = .true.
 
        case default
           call ErrorMsg()
@@ -916,10 +950,11 @@ contains
     use FFI
     implicit none
 
-    integer k, inode, ibody, cpl, i,j,m,n
+    integer k, inode, ibody, cpl, i,j,m,n,parBegin,parEnd,b,p
     real(8):: vxp, vyp, vzp,v0,dc,y,A,W,q,c1,c2,x
-    integer,parameter:: nbkw = 5
-    character(4),parameter:: kw(nbkw) = (/'endv','node','body','ksin','kbonuli'/)
+    integer,parameter:: nbkw = 6
+    character(4),parameter:: kw(nbkw) = (/'endv','node','body','ksin','kbonuli','vsin'/)
+    type(Particle),POINTER::pt
 
     if(nb_body.eq.0) then
        stop '*** Error *** nbby must be defined !'
@@ -983,7 +1018,20 @@ contains
             particle_list(i)%VXp(3) = 0
           end do
         end do
-              
+        
+        case(6)!used for Free softbeam
+        v0 = GetReal()
+            do b = 1,nb_body
+                parBegin = body_list(b)%par_begin
+                parEnd   = body_list(b)%par_End
+                do p = parBegin,parEnd
+                    pt => particle_list(p)
+                    pt%VXp(1)=v0*sin(3.1415926535*pt%xo(2)/6)
+                    pt%VXp(2)=0
+                    pt%VXp(3)=0
+                end do
+            end do
+        
        case default    ! error
           call ErrorMsg()
           stop 'error GetVelocity'
@@ -1028,12 +1076,12 @@ contains
     use FFI
     implicit none
     integer:: k
-    integer,parameter:: nbkw = 16
+    integer,parameter:: nbkw = 18
     character(4),parameter:: kw(nbkw) = (/ &
          'seqv','epef','mat ','pres','volu',&
          'engk','engi','velx','vely','velz',&
-         'cels','fail','sspd','damg','stressx','disx' &
-         /)
+         'cels','fail','sspd','damg','stressx','disx',&
+         'disy','disz'/)
 
     SetResOption = keyword(kw,nbkw)
 
@@ -1095,6 +1143,9 @@ contains
        mat_list(mset)%cEos(4) = GetReal()        ! R2
        mat_list(mset)%cEos(5) = GetReal()        ! w
        mat_list(mset)%cEos(10) = GetReal()       ! E0
+    
+    case(4) !Weakly Compressible EOS
+      mat_list(mset)%cEos(1) = GetReal()         !C Numerical Speed
 
     case default
        call ErrorMsg()
@@ -1170,8 +1221,10 @@ contains
     integer i, j, m, c, mtype, b
     integer parBegin, parEnd
     real temp
+    real(8)  nu, E, ro
     type(particle), pointer:: pt
     type(body), pointer:: bd
+    
 
     do b = 1, nb_body
        bd => body_list(b)
@@ -1182,12 +1235,21 @@ contains
           m = bd%mat
           mtype = mat_list(m)%MatType
           !The deformable body
-          if (mtype .ne.12)then                      
+          if (mtype .ne.12)then         
              pt%VOL = pt%mass / mat_list(m)%Density
+             pt%VOL0 =  pt%VOL
              pt%sig_y = mat_list(m)%Yield0
-
              pt%ie = mat_list(m)%cEos(10) * pt%VOL
-
+             if (mtype==1.OR.mtype==11 )then
+                 E = mat_list(m)%Young
+                 nu = mat_list(m)%Poisson
+                 ro = mat_list(m)%Density
+                 pt%cp = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro) 
+             end if
+             if (mtype==9 ) then 
+                pt%cp = mat_list(m)%Wavespd 
+                mat_list(m)%cEos(1)=mat_list(m)%Wavespd
+             end if
              pt%LT = 10e6
              do j = 1, nDeto
                 temp = sqrt((pt%Xp(1)-DetoX(j))**2 + &
@@ -1197,6 +1259,8 @@ contains
                 pt%LT = min(temp,pt%LT)
              end do
           end if
+          
+          
        end do
     end do
 

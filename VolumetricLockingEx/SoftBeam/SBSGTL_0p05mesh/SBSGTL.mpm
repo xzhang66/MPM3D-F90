@@ -1,0 +1,47 @@
+mpm3d *** SoftBeam_SGTLMPM
+!References:Kadapa. Novel quadratic Bézier triangular and tetrahedral elements using existing mesh generators: Applications to linear nearly incompressible elastostatics and implicit and explicit elastodynamics[J]. IJNME, 2019
+! Unit: m  Kg  N  s  Pa
+nbco 1
+nbbo 1
+nbmp 9600
+nmat 1
+!Note that when using SGMPM , 
+!it is necessary to extend at least one layer outward in the boundary
+!And when the boundary is not free boundary only one layer of background grid length can be extended 
+spx  -1.05  0.05
+spy   -0.05   6.05
+spz   0   0.05
+dcell  0.05
+
+dtscale 0.9
+endtime 1.2
+
+outtime 0.1
+rpttime 0.02
+
+musl on
+sgmp
+smoo
+UVFp
+TLmp
+bulk 1.5 0.06
+
+curv disx 9600
+para
+
+!      x0  xn  y0  yn  z0 zn
+fixed  0   0   1   0   2   2
+
+material
+!  num     mtype  density   E v
+    1      neoh  1100   17e6   0.499
+
+ Particle block 1 
+! matid density dp   0x 0y   0z     nx  ny  nz
+  1         1100 0.025 -1  0 0.0125  40 240  1
+
+velo
+body 1 10 0 0 
+endv
+ 
+endi

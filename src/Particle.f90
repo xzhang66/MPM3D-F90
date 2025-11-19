@@ -26,12 +26,19 @@ module ParticleData
      real(8):: Xo(3)     ! particle position at time step t=0 
      real(8):: VXp(3)    ! particle velocity
      real(8):: FXp(3)    ! load
+     real(8):: PK(9)     ! 1st PK Stress for TLMPM
+     real(8):: XXN(3)    ! particle natural coordinates in the auxiliary grid
+     real(8):: XN(3)     ! particle natural coordinates in the background grid
+     integer:: inode     ! the node(on the background grid)number which is closest to the particle
 
      real(8):: VOL       ! current volume
+     real(8):: VOL0      ! initial volume
      real(8):: sig_y     ! yield stress
      real(8):: SM, Seqv  ! mean stress and Mises stress
      ! deviatoric stress
      real(8):: SDxx, SDyy, SDzz, SDxy, SDyz, SDxz 
+     real(8):: Spre = 0.0!Smoothed pressure
+     real(8):: Fp(3,3)   ! deformation gradient Fp(1,1)=Fpxx-1;Fp(2,2)=Fpyy-1;Fp(3,3)=Fpzz-1
      real(8):: epeff     ! effective plastic strain
      real(8):: celsius_t ! celsius temperature
 
@@ -77,12 +84,19 @@ module ParticleData
   logical:: GIMP = .false.      ! use cpGIMP method? 
   logical:: Bspline=.false.     ! use Bspline method?
   logical:: SGMP=.false.        ! use SGMP method?
+  logical:: QuasiLoad=.false.   ! use quasi_static load?
+  logical:: QuasiDamp=.false.   ! use QuasiDamp ?
+  logical:: SmoothStress=.false.! use SmoothStressbyGrid method?
+  logical:: UpdateVbyFp =.false.! use Fp method to upgrade Volume?
+  logical:: TLMPM = .false.     ! use TLMPM format£¿
   logical:: contact = .false.   ! use contact method?
   logical:: Gravity = .false.   ! set gravity?
   logical:: DR_DAMPING = .false. ! use dynamic relaxation techniques for quasi static solution?
 
   integer:: istep = 0           ! Current time step
   real(8):: DT = 0              ! time step interval
+  real(8):: QuasiLoadTime  = 0.0! quasi_static load time
+  real(8):: DampFactor  = 0.0   !  QuasiDamp Factor
   real(8):: CurrentTime = 0.0   ! Time for current step
   real(8):: EndTime = 0.0    ! Time for end of solution
   real(8):: DTScale = 0.9    ! time step size factor (<= 1.0)
@@ -102,8 +116,9 @@ contains
 !    used after particle_list space allocated                     -
 !------------------------------------------------------------------
     implicit none
-	integer :: i
-
+	integer :: i,j
+  
+    particle_list%cp = 0.0d0
     particle_list%SM = 0.0d0
     particle_list%seqv = 0.0d0
     particle_list%SDxx = 0.0d0
@@ -118,6 +133,16 @@ contains
 	do i = 1, 3
 		particle_list%VXp(i) = 0.0d0
 		particle_list%FXp(i) = 0.0d0
+    end do
+    
+    do i = 1,3
+          do j = 1,3
+                particle_list%Fp(i,j) = 0.0
+          end do
+    end do
+    
+    do i = 1, 9
+		particle_list%PK(i) = 0.0d0
 	end do
 
     particle_list%DMG = 0.0
