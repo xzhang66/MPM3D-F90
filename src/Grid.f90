@@ -300,12 +300,12 @@ function AuxiliaryGridSHP(XN,XXN,p_type)result(XINB)
              node_list(i)%Xg(1) = (ix - 1)*DCell + SpanX(1)
              node_list(i)%Xg(2) = (iy - 1)*DCell + SpanY(1)
              node_list(i)%Xg(3) = (iz - 1)*DCell + SpanZ(1)
-             if(ix==1.and.FixS(1))    node_list(i)%bd_type(1)=1
-             if(ix==NGx.and.FixS(2))  node_list(i)%bd_type(1)=2
-             if(iy==1.and.FixS(3))    node_list(i)%bd_type(2)=1
-             if(iy==NGy.and.FixS(4))  node_list(i)%bd_type(2)=2
-             if(iz==1.and.FixS(5))    node_list(i)%bd_type(3)=1
-             if(iz==NGz.and.FixS(6))  node_list(i)%bd_type(3)=2
+             if(ix==1.and.FixS(1)/=0)    node_list(i)%bd_type(1)=1
+             if(ix==NGx.and.FixS(2)/=0)  node_list(i)%bd_type(1)=2
+             if(iy==1.and.FixS(3)/=0)    node_list(i)%bd_type(2)=1
+             if(iy==NGy.and.FixS(4)/=0)  node_list(i)%bd_type(2)=2
+             if(iz==1.and.FixS(5)/=0)    node_list(i)%bd_type(3)=1
+             if(iz==NGz.and.FixS(6)/=0)  node_list(i)%bd_type(3)=2
              if(sgmp) then
                   if(ix==2.and.FixS(1)/=0)      node_list(i)%bd_type(1)=1
                   if(ix==NGx-1.and.FixS(2)/=0)  node_list(i)%bd_type(1)=2
