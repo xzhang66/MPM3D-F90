@@ -3,9 +3,6 @@
   "WorkspaceRootPath": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\make\\ivf\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{97108251-87B2-43A6-971B-74355B2A774E}|mpm3d-f90.vfproj|c:\\users\\user\\desktop\\mpm3d\\mpm3d\\mpm3d-f90\\src\\update_step.f90||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{97108251-87B2-43A6-971B-74355B2A774E}|mpm3d-f90.vfproj|c:\\users\\user\\desktop\\mpm3d\\mpm3d\\mpm3d-f90\\src\\grid.f90||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
@@ -24,6 +21,9 @@
       "AbsoluteMoniker": "D:0:0:{97108251-87B2-43A6-971B-74355B2A774E}|mpm3d-f90.vfproj|c:\\users\\user\\desktop\\mpm3d\\mpm3d\\mpm3d-f90\\src\\dataout.f90||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{97108251-87B2-43A6-971B-74355B2A774E}|mpm3d-f90.vfproj|c:\\users\\user\\desktop\\mpm3d\\mpm3d\\mpm3d-f90\\src\\update_step.f90||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{97108251-87B2-43A6-971B-74355B2A774E}|mpm3d-f90.vfproj|c:\\users\\user\\desktop\\mpm3d\\mpm3d\\mpm3d-f90\\src\\material.f90||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
@@ -37,11 +37,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "DataIn.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\DataIn.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\DataIn.f90",
@@ -54,7 +54,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 5,
               "Title": "DataOut.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\DataOut.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\DataOut.f90",
@@ -80,13 +80,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "Grid.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\Grid.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\Grid.f90",
               "ToolTip": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\Grid.f90",
               "RelativeToolTip": "..\\..\\src\\Grid.f90",
-              "ViewState": "AgIAAK0AAAAAAAAAAAAswMAAAAAnAAAAAAAAAA==",
+              "ViewState": "AgIAACMBAAAAAAAAAAAswCoAAABrAAAAAAAAAA==",
               "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACHSURBVDhPvZPBDcAgCAClPxmtcYoO1ilMR8OnDQlEpT6kTXofNcETRKHWGhQAkNkIEbWgDowxDIJSyjSQufCUWWOn4ylIKcmqkXP2CXiDRQW8qWeTcRkWqQwRwS2wuAVcQl/G6ww4fR6XBfZkxZ2BbfP/l2j5LFh6yhZ\u002BqdqF5c9kmQr8hHADIeBJHT9TZrUAAAAASUVORK5CYIIAAAAAAAAAAAAAAAAAAA==",
               "WhenOpened": "2025-11-18T11:24:31.895Z",
               "EditorCaption": ""
@@ -106,20 +106,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 6,
               "Title": "update_step.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\update_step.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\update_step.f90",
               "ToolTip": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\update_step.f90",
               "RelativeToolTip": "..\\..\\src\\update_step.f90",
-              "ViewState": "AgIAAKYBAAAAAAAAAAAYwLkBAAAUAAAAAAAAAA==",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAA8AAABEAAAAAAAAAA==",
               "Icon": "00000000-0000-0000-0000-000000000000.000000|iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACHSURBVDhPvZPBDcAgCAClPxmtcYoO1ilMR8OnDQlEpT6kTXofNcETRKHWGhQAkNkIEbWgDowxDIJSyjSQufCUWWOn4ylIKcmqkXP2CXiDRQW8qWeTcRkWqQwRwS2wuAVcQl/G6ww4fR6XBfZkxZ2BbfP/l2j5LFh6yhZ\u002BqdqF5c9kmQr8hHADIeBJHT9TZrUAAAAASUVORK5CYIIAAAAAAAAAAAAAAAAAAA==",
               "WhenOpened": "2025-11-18T11:23:59.808Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 4,
               "Title": "Particle.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\Particle.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\Particle.f90",
@@ -132,7 +132,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 3,
               "Title": "MPM3D.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\MPM3D.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\MPM3D.f90",
@@ -145,7 +145,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "Constitution.f90",
               "DocumentMoniker": "C:\\Users\\user\\Desktop\\MPM3D\\MPM3D\\MPM3D-F90\\src\\Constitution.f90",
               "RelativeDocumentMoniker": "..\\..\\src\\Constitution.f90",

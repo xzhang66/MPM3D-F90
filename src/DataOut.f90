@@ -29,11 +29,11 @@ module DataOut
   integer:: nAnm = 0
 
   integer, parameter:: nVariables = 18
-  character(4), parameter:: OutputName(nVariables) = (/ &
+  character(len=4), parameter:: OutputName(nVariables) = (/ &
        'seqv','epef','mat ','pres','volu',  &
        'engk','engi','velx','vely','velz',  &
-       'cels','fail','sspd','damg','stressx','disx',&
-      'disy','disz'/)
+       'cels','fail','sspd','damg','stsx','disx',&
+      'disy','disz'/)!'stsx'represents Stress in X direction
        
 
   logical:: WriteTecPlot  = .false.
@@ -125,7 +125,7 @@ contains
           write(iow2,"(e12.4)", advance='no') pt%SDzz
        case(14) !damg
           write(iow2,"(e12.4)", advance='no') pt%DMG
-        case(15) !stressx
+        case(15) !stsx
           write(iow2,"(e12.4)", advance='no') pt%SDxx+pt%SM
         case(16) !disx
           write(iow2,"(e12.4)", advance='no') pt%Xp(1)-pt%Xo(1)
@@ -171,8 +171,7 @@ contains
     nAnm = nAnm + 1
     if (nAnm .eq. 1) then
        write(iow1,10) Title
-       write(iow1,20) ('"', OutputName(AnimOption(i)), '"', &
-                            i=1,nAnimate)
+        write(iow1,20) ('"' // trim(OutputName(AnimOption(i))) // '"', i=1,nAnimate)
     end if
 10  format('TITLE = "', a60, '"')
 20  format('VARIABLES= "X"   "Y"   "Z"  ', 50(A2, A4, A1))

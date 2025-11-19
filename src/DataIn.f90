@@ -550,7 +550,7 @@ contains
 
     integer,parameter:: nbkw = 5
     character(4),parameter:: kw(nbkw) = (/  &
-         'poin','bloc','sphe','blod','cicle'  /)
+         'poin','bloc','sphe','blod','cicl'  /)!cicl represents 'cicle'
 
     if(nb_particle.eq.0) then
        stop '*** Error *** nbmp must be defined in advance!'
@@ -953,7 +953,7 @@ contains
     integer k, inode, ibody, cpl, i,j,m,n,parBegin,parEnd,b,p
     real(8):: vxp, vyp, vzp,v0,dc,y,A,W,q,c1,c2,x
     integer,parameter:: nbkw = 6
-    character(4),parameter:: kw(nbkw) = (/'endv','node','body','ksin','kbonuli','vsin'/)
+    character(4),parameter:: kw(nbkw) = (/'endv','node','body','ksin','nuli','vsin'/)!'nuli'represents'kbonuli'
     type(Particle),POINTER::pt
 
     if(nb_body.eq.0) then
@@ -1080,8 +1080,8 @@ contains
     character(4),parameter:: kw(nbkw) = (/ &
          'seqv','epef','mat ','pres','volu',&
          'engk','engi','velx','vely','velz',&
-         'cels','fail','sspd','damg','stressx','disx',&
-         'disy','disz'/)
+         'cels','fail','sspd','damg','stsx','disx',&
+         'disy','disz'/)!'stsx'represents Stress in X direction
 
     SetResOption = keyword(kw,nbkw)
 
