@@ -2,12 +2,12 @@ mpm3d *** 1D TNT
 ! Unit: mm  g  N  ms  MPa
 nbco 1
 nbbo 1
-nbmp 4000 ! 
+nbmp 4000 
 nmat 1
 
-spx  -100   101.0
-spy   -0.05   0.1
-spz   -0.05    0.1
+spx  -0.05   101.0
+spy   -0.025   0.025
+spz   -0.025    0.025
 dcell  0.05
 
 dtscale 0.1
@@ -21,11 +21,11 @@ jaum on
 bulk 1.5 0.06
 sgmp
 
-tecp
+para
 outr pres
 outr velx
 !      x0  xn  y0  yn  z0  zn
-fixed  0   0   2   2   2   2
+fixed  2   0   2   2   2   2
 
 material
 !  num     mtype  density   detonation D
