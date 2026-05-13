@@ -207,7 +207,7 @@ function AuxiliaryGridSHP(XN,XXN,p_type)result(XINB)
     real(8):: XINB(3)
     integer:: i,p_type(3)
     do i = 1,3
-        if(p_type(i))then
+        if(p_type(i) /= 0)then
             if(XN(i)<0) then
                 XINB(i)=1+2*XN(i)
             else
