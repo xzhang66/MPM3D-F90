@@ -1856,17 +1856,15 @@ subroutine UpdateDT()
     end do    !b
     DT = 1e6
     do m = 1, nb_mat
-       mtype = mat_list(m)%MatType
-       if (mtype .ne.12)then         !The deformable body
-          E = mat_list(m)%Young
-          nu = mat_list(m)%Poisson
-          ro = mat_list(m)%Density
-          vv = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro)    ! sound speed
-          vv = max(vv,mat_list(m)%D)
-          vv = max(vv,mat_list(m)%Wavespd)
-          vv = vv + max_vp
-          DT = min(DT, DCell/vv)
-       end if
+        mtype = mat_list(m)%MatType
+        E = mat_list(m)%Young
+        nu = mat_list(m)%Poisson
+        ro = mat_list(m)%Density
+        vv = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro)    ! sound speed
+        vv = max(vv,mat_list(m)%D)
+        vv = max(vv,mat_list(m)%Wavespd)
+        vv = vv + max_vp
+        DT = min(DT, DCell/vv)
     end do
 
     DT = DT*DTscale

@@ -261,7 +261,7 @@ contains
     integer:: fCounter ! failure particle counter
     integer:: matID      ! material number
     integer:: rename, iStepNo, status, idx
-    character*80:: FileAnimNext, stepc
+    character*256:: FileAnimNext, stepc
     character*60, parameter:: gridtype = 'UnstructuredGrid'
     character*4:: indent = '    '
 

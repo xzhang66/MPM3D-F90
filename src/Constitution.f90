@@ -337,6 +337,12 @@ contains
       ! call sigrot(vort, sig, sm, sd)    ! Rotate stress
        call M3DM10()
        call lieupd()
+       
+   case(12)
+       ! SofteningClay  model
+       call sigrot(vort, sig, sm, sd)
+       call M3DM12(mat_list(mid), DT)
+       call lieupd()
 
     case default 
        write(*, 10) mtype_
@@ -879,7 +885,75 @@ contains
     iener = iener + ieinc*0.5*(vol_ + vold)
 
 
-  end subroutine M3DM11
+ end subroutine M3DM11
+ 
+subroutine  M3DM12(mat, DT)
+!------------------------------------------------------------------
+!-  Purpose                                                       -
+!-      Modified for softening plasticity model                   -
+!-      elasticity + J2 plasticity with exponential softening
+!-      Based on undrained sensitive clay model (Bui and Nguyen) -
+!------------------------------------------------------------------
+    implicit none
+
+    real(8), intent(in) :: DT
+    type(material), intent(in) :: mat
+    real(8):: kappa_p, kappa_r, eta_soft, epso
+    
+    ieinc = sig(1)*dinc(1) + sig(2)*dinc(2) + sig(3)*dinc(3) +  &
+        sig(4)*dinc(4) + sig(5)*dinc(5) + sig(6)*dinc(6)
+    
+    ! softening model parameters
+    kappa_p = mat%kappa_p      ! Peak strength
+    kappa_r = mat%kappa_r      ! Residual strength
+    eta_soft = mat%eta_soft    ! Softening coefficient
+    epso = mat%epso            ! Reference strain rate (optional)
+
+    ! Calculate current plastic modulus (negative derivative of exponential softening)
+    PlaMod = -eta_soft * (kappa_p - kappa_r) * exp(-eta_soft * epeff_)
+    
+    ! Elastic trial step remains unchanged
+    call elastic_devi()
+    seqv = EquivalentStress()
+    
+    !  Calculate current yield strength (exponential softening law)
+    sig_y_ = kappa_r + (kappa_p - kappa_r) * exp(-eta_soft * epeff_)
+
+    if (seqv .GT. sig_y_) then
+        ! Calculate plastic strain increment 
+        depeff = (seqv - sig_y_) / (1.5e0*G2 + PlaMod)
+        epeff_ = epeff_ + depeff
+        
+        !  Update yield strength based on new plastic strain
+        sig_y_ = kappa_r + (kappa_p - kappa_r) * exp(-eta_soft * epeff_)
+        
+        if(sig_y_ .GT. seqv) then
+            ! If updated yield strength still exceeds trial stress (numerical error)
+            epeff_ = epeff_ - depeff
+            depeff = 0.0
+        else
+            ! Radial return: scale deviatoric stresses
+            ratio = sig_y_/seqv
+            
+            sd(1) = sd(1)*ratio
+            sd(2) = sd(2)*ratio
+            sd(3) = sd(3)*ratio
+            sd(4) = sd(4)*ratio
+            sd(5) = sd(5)*ratio
+            sd(6) = sd(6)*ratio
+            
+            seqv = seqv*ratio
+        end if
+    end if
+    
+    call elastic_p()
+
+    ieinc = ieinc + (sd(1)+sm)*dinc(1) + (sd(2)+sm)*dinc(2) + &
+            (sd(3)+sm)*dinc(3) +  sd(4)*dinc(4) + &
+            sd(5)*dinc(5) + sd(6)*dinc(6)  ! (part of Eq: 5.10)
+
+end subroutine M3DM12
+
 
 
   subroutine M3DM2()

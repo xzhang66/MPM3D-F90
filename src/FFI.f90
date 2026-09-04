@@ -27,8 +27,8 @@ module FFI
   integer:: iow11 = 111               ! write output file
   integer:: iow12 = 112	              ! write anim file collection
   
-  character*80 jobname, FileInp, FileOut
-  character*80 fName, FileCurv, FileAnim, FileAnimColl
+  character*256 jobname, FileInp, FileOut
+  character*256 fName, FileCurv, FileAnim, FileAnimColl
 
 !------------------------------------------------------------------
 !-  line_nb - current line number                                 -

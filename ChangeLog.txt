@@ -10,3 +10,6 @@
 6. Add an external quasi-static loading module,  activated by entering the keyword 'QuLo' and quasi-static loading time.
 7. Add the external damping factor module required for quasi-static problems, enter the keyword 'Damp' and damping factor to activate this function.
 8. Add the function of updating the time step DT.
+2026.9.4
+1.Add a simplified DP constitutive model for simulating undrained clay materials
+2.Eliminate path truncation bugs caused by excessively long input file path names

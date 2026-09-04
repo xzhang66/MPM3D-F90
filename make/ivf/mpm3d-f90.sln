@@ -1,18 +1,26 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "mpm3d-f90", "mpm3d-f90.vfproj", "{97108251-87B2-43A6-971B-74355B2A774E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
 		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{97108251-87B2-43A6-971B-74355B2A774E}.Debug|Win32.ActiveCfg = Debug|Win32
 		{97108251-87B2-43A6-971B-74355B2A774E}.Debug|Win32.Build.0 = Debug|Win32
+		{97108251-87B2-43A6-971B-74355B2A774E}.Debug|x64.ActiveCfg = Debug|x64
+		{97108251-87B2-43A6-971B-74355B2A774E}.Debug|x64.Build.0 = Debug|x64
 		{97108251-87B2-43A6-971B-74355B2A774E}.Release|Win32.ActiveCfg = Release|Win32
 		{97108251-87B2-43A6-971B-74355B2A774E}.Release|Win32.Build.0 = Release|Win32
+		{97108251-87B2-43A6-971B-74355B2A774E}.Release|x64.ActiveCfg = Release|x64
+		{97108251-87B2-43A6-971B-74355B2A774E}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

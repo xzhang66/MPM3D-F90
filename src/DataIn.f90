@@ -375,11 +375,11 @@ contains
 
     integer i, t, mtype, matcount
 
-    integer,parameter:: nbkw = 11
+    integer,parameter:: nbkw = 12
     character(4),parameter:: kw(nbkw) = (/&
          'elas','pla1','pla2','john','sjc ',&
          'sjcf','jcf ','hiex','null','dpm ',&
-         'neoh'/)
+         'neoh', 'clay'/)
 
     if(nb_mat.eq.0 .or. nb_particle.eq.0) then
        stop '*** Error *** nb_mat/nb_particle must be defined in advance!'
@@ -505,6 +505,16 @@ contains
           mat_list(i)%Young = GetReal()
           mat_list(i)%Poisson = GetReal()
           UpdateVbyFp = .true.
+          
+       case(12) ! brittle clay
+          mat_list(i)%MatType = 12
+          mat_list(i)%Density = GetReal()
+          mat_list(i)%Young = GetReal()
+          mat_list(i)%Poisson = GetReal()
+          mat_list(i)%kappa_p = GetReal()     ! Peak strength
+          mat_list(i)%kappa_r = GetReal()     ! Residual strength
+          mat_list(i)%eta_soft = GetReal()   ! Softening coefficient
+          mat_list(i)%epso = GetReal()
 
        case default
           call ErrorMsg()
@@ -1231,35 +1241,32 @@ contains
        parBegin = bd%par_begin
        parEnd = bd%par_end
        do i = parBegin, parEnd
-          pt => particle_list(i)
-          m = bd%mat
-          mtype = mat_list(m)%MatType
-          !The deformable body
-          if (mtype .ne.12)then         
-             pt%VOL = pt%mass / mat_list(m)%Density
-             pt%VOL0 =  pt%VOL
-             pt%sig_y = mat_list(m)%Yield0
-             pt%ie = mat_list(m)%cEos(10) * pt%VOL
-             if (mtype==1.OR.mtype==11 )then
-                 E = mat_list(m)%Young
-                 nu = mat_list(m)%Poisson
-                 ro = mat_list(m)%Density
-                 pt%cp = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro) 
-             end if
-             if (mtype==9 ) then 
+            pt => particle_list(i)
+            m = bd%mat
+            mtype = mat_list(m)%MatType
+            !The deformable body
+            pt%VOL = pt%mass / mat_list(m)%Density
+            pt%VOL0 =  pt%VOL
+            pt%sig_y = mat_list(m)%Yield0
+            pt%ie = mat_list(m)%cEos(10) * pt%VOL
+            if (mtype==1.OR.mtype==11 )then
+                E = mat_list(m)%Young
+                nu = mat_list(m)%Poisson
+                ro = mat_list(m)%Density
+                pt%cp = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro) 
+            end if
+            if (mtype==9 ) then 
                 pt%cp = mat_list(m)%Wavespd 
                 mat_list(m)%cEos(1)=mat_list(m)%Wavespd
-             end if
-             pt%LT = 10e6
-             do j = 1, nDeto
+            end if
+            pt%LT = 10e6
+            do j = 1, nDeto
                 temp = sqrt((pt%Xp(1)-DetoX(j))**2 + &
                             (pt%Xp(2)-DetoY(j))**2 + &
                             (pt%Xp(3)-DetoZ(j))**2) /   &
                             mat_list(m)%D
                 pt%LT = min(temp,pt%LT)
-             end do
-          end if
-          
+            end do
           
        end do
     end do
@@ -1278,18 +1285,15 @@ contains
     DT = 1.0e6
 
     do m = 1, nb_mat
+        mtype = mat_list(m)%MatType
+        E = mat_list(m)%Young
+        nu = mat_list(m)%Poisson
+        ro = mat_list(m)%Density
+        cp = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro)    ! sound speed
+        cp = max(cp,mat_list(m)%D)
+        cp = max(cp,mat_list(m)%Wavespd)
+        DT = min(DT, DCell/cp)
 
-       mtype = mat_list(m)%MatType
-       if (mtype .ne.12)then         !The deformable body
-
-          E = mat_list(m)%Young
-          nu = mat_list(m)%Poisson
-          ro = mat_list(m)%Density
-          cp = sqrt(E*(1-nu)/(1+nu)/(1-2*nu)/ro)    ! sound speed
-          cp = max(cp,mat_list(m)%D)
-          cp = max(cp,mat_list(m)%Wavespd)
-          DT = min(DT, DCell/cp)
-       end if
     end do
 
     DT = DT*DTscale

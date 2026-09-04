@@ -35,6 +35,7 @@ module MaterialData
      real(8):: SpecHeat   ! Specified heat capacity
      ! Parameters for Johnson-Cook material
      real(8):: B_jc, n_jc, C_jc, m_jc    
+     real(8):: kappa_p,kappa_r,eta_soft ! Parameters for clay material
      ! strain rate normalization factor used in J-C model
      real(8):: epso    
      real(8):: prd      ! tensile pressure to begin damage
